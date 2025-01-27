@@ -16,11 +16,11 @@ def create_chessboard(size=100, block_size=10):
 
  # Generate 125 strain tensors
 def generate_strain_tensors():
-    strain_xx = np.linspace(0.8, 1.9, 5)  # Stretching values
-    strain_yy = np.linspace(0.8, 1.9, 5)  # Stretching values
-    shear_xy1 = np.linspace(-0.9, -0.5, 2)   # Shear strain
-    shear_xy2 = np.linspace(0.5, 0.9, 2)   # Shear strain
-    shear_xy = np.concatenate((shear_xy1, shear_xy2))
+    strain_xx = np.array([-0.5, -0.75, 1.5, 2])  # Stretching values
+    strain_yy = np.array([-0.5, -0.75, 1.5, 2])  # Stretching values
+    # shear_xy1 = np.linspace(-0.9, -0.5, 2)   # Shear strain
+    # shear_xy2 = np.linspace(0.5, 0.9, 2)   # Shear strain
+    shear_xy = np.array([-0.8,-0.4,0.4,0.8])
     tensors = [
         (xx, yy, xy)
         for xx in strain_xx
@@ -56,7 +56,7 @@ def apply_corotated_strain(image, s):
     F_strain_h[:2, :2] = F_strain
 
     # Center image for proper transformation
-    center = np.array(image.shape) / 2
+    center = np.array(image.shape[:2]) / 2
     translation_to_origin = np.eye(3)
     translation_to_origin[:2, 2] = -center
 
@@ -80,7 +80,7 @@ def apply_corotated_strain(image, s):
 
 
 # Apply the strain tensor and transformation
-def apply_strain(image, strain_tensor):
+def apply_strain(image, s, keypoints=None):
     """
     Apply a strain tensor to deform the 2D image.
     Parameters:
@@ -91,6 +91,9 @@ def apply_strain(image, strain_tensor):
     - deformed_image: 2D numpy array, transformed image
     """
     
+    strain_tensor = np.array([[s[0], s[2]], 
+                              [s[2], s[1]]])
+
     # Transformation matrix: F = I + ε
     transformation_matrix = np.eye(2) + strain_tensor
 
@@ -110,7 +113,12 @@ def apply_strain(image, strain_tensor):
         preserve_range=True, 
         order=3  # Bicubic interpolation
     )
-    return deformed_image
+
+    # Apply the same transformation to the keypoints
+    if keypoints is not None:
+        keypoints = transform(keypoints)
+
+    return deformed_image, keypoints
 
 
 # Display images in pages of 25
@@ -157,16 +165,21 @@ def display_images_in_pages(image, tensors, rows=5, cols=5):
         input(f"Press Enter to see the next page (page {page + 2} of {pages})...")
 
 
+def apply_transformation_from_index(image, index, origin):
+    tensors = generate_strain_tensors()
+    
+
+
 
 # Main
-image_size = 100
-block_size = 5
-padding = 100  # Prevent clipping
+# image_size = 100
+# block_size = 5
+# padding = 100  # Prevent clipping
 
-# Create and pad chessboard image
-image = create_chessboard(size=image_size, block_size=block_size)
-image = io.imread('patch.png', as_gray=True)
-image = pad(image, padding, mode="constant", constant_values=0)
+# # Create and pad chessboard image
+# image = create_chessboard(size=image_size, block_size=block_size)
+# image = io.imread('patch.png', as_gray=True)
+# image = pad(image, padding, mode="constant", constant_values=0)
 
 '''
 # Define a strain tensor
@@ -209,9 +222,61 @@ plt.tight_layout()
 plt.show()
 '''
 
-# Generate strain tensors
-strain_tensors = generate_strain_tensors()
-print(strain_tensors)
+# # Generate strain tensors
+# strain_tensors = generate_strain_tensors()
+# print(strain_tensors)
     
-# Display images in pages of 25
-display_images_in_pages(image, strain_tensors)
+# # Display images in pages of 25
+# display_images_in_pages(image, strain_tensors)
+
+def apply_corotated_strain_with_keypoints(image, keypoints, s):
+
+    strain_tensor = np.array([[s[0], s[2]], 
+                              [s[2], s[1]]])
+    F = deformation_gradient_from_strain(strain_tensor)
+
+    R, F_strain = polar_decomposition(F)
+
+    # Build affine transform matrix (add homogeneous coordinates)
+    F_strain_h = np.eye(3)
+    F_strain_h[:2, :2] = F_strain
+
+    # Center image for proper transformation
+    center = np.array(image.shape[:2]) / 2
+    translation_to_origin = np.eye(3)
+    translation_to_origin[:2, 2] = -center
+
+    translation_back = np.eye(3)
+    translation_back[:2, 2] = center
+
+    # Combine transformations
+    affine_matrix = translation_back @ F_strain_h @ translation_to_origin
+    transform = AffineTransform(matrix=affine_matrix)
+
+    # Apply warp
+    transformed_image = warp(
+        image,
+        inverse_map=transform.inverse,
+        mode="constant",
+        cval=0.0,
+        preserve_range=True,
+        order=3  # Bicubic interpolation
+    )
+
+    # Apply the same transformation to the keypoints
+    keypoints_h = np.hstack((keypoints, np.ones((keypoints.shape[0], 1))))
+    transformed_keypoints = keypoints_h @ affine_matrix.T
+    transformed_keypoints = transformed_keypoints[:, :2] / transformed_keypoints[:, 2:3]
+
+    return transformed_image, transformed_keypoints[None, :, :]
+
+
+def apply_strain_to_keypoints(keypoints, s):
+    strain_tensor = np.array([[s[0], s[2]], 
+                              [s[2], s[1]]])
+
+    # Transformation matrix: F = I + ε
+    transformation_matrix = np.eye(2) + strain_tensor
+
+    keypoints = np.dot(keypoints, np.linalg.inv(transformation_matrix).T)
+    return keypoints

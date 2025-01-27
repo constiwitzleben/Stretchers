@@ -7,6 +7,7 @@ from DeDoDe.utils import *
 from PIL import Image
 import cv2
 import numpy as np
+from Affine_Transformations import generate_strain_tensors
 
 image_dir = "data/data"
 deformations_per_kp = 8
@@ -21,7 +22,8 @@ images = sorted([os.path.join(image_dir, file) for file in os.listdir(image_dir)
 
 non_deformed_descriptors = np.zeros((len(images)*kp_per_image*deformations_per_kp, 256))
 deformed_descriptors = np.zeros((len(images)*kp_per_image*deformations_per_kp, 256))
-deformations = np.zeros((len(images),kp_per_image,deformations_per_kp))
+deformation_idx = np.random.randint(0,64,size=(num_images,kp_per_image,deformations_per_kp))
+deformation_grid = generate_strain_tensors()
 
 for i, image in enumerate(images):
 
@@ -31,11 +33,13 @@ for i, image in enumerate(images):
     non_deformed_descriptors[i*kp_per_image*deformations_per_kp:(i+1)*kp_per_image*deformations_per_kp] = np.repeat(description.cpu(),deformations_per_kp,axis=0)
 
     for j, kp in enumerate(keypoints):
+        
+        deformations = deformation_grid[deformation_idx[i,j]]
 
-        # print(description)
-        print(description.shape)
-        for i in range(deformations_per_kp):
+        for deformation in enumerate(deformations):
             
+            
+
             break
         break
     # break
