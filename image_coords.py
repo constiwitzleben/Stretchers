@@ -23,13 +23,17 @@ im_path = 'data/data/000000000042.jpg'
 # plt.imshow(image.permute(1, 2, 0))
 # plt.show()
 
-out1 = detector.detect_from_path(im_path, num_keypoints = 6)
+out1 = detector.detect_from_path(im_path, num_keypoints = 1000)
 im = Image.open(im_path)
 W,H = im.size
 # print(W,H)
-kps1 = out1["keypoints"].cpu()
+kps1 = out1["keypoints"].cpu()[0]
 print(kps1)
-kps1_pixel = detector.to_pixel_coords(kps1, H, W)
+margin = 0.2
+condition = (np.abs(kps1[:, 0]) <= margin) & (np.abs(kps1[:, 1]) <= margin)
+kps1 = kps1[condition]
+print(kps1)
+kps1_pixel = detector.to_pixel_coords(kps1[None,...], H, W)
 
 def draw_kpts(im, kpts):    
     kpts = [cv2.KeyPoint(x,y,15.) for x,y in kpts.cpu().numpy()]
@@ -52,10 +56,10 @@ np_image = np.array(im)
 # print(np_image.shape)
 # deformed_image = apply_corotated_strain(np_image, tensors[0])
 # deformed_image = apply_corotated_strain(np_image[...,::-1], tensors[0])
-deformed_image, kps2_pixel = apply_corotated_strain_with_keypoints(np_image[...,::-1], kps1_pixel[0], tensors[0])
+deformed_image, kps2_pixel = apply_corotated_strain_with_keypoints(np_image[...,::-1], kps1_pixel[0], tensors[63])
 
 kps2 = detector.to_normalized_coords(torch.tensor(kps2_pixel), H, W)
-print(kps2)
+
 
 # kps2 = apply_strain_to_keypoints(kps1, tensors[0])
 # print(kps2_pixel)
