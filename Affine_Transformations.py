@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 from skimage.transform import warp, AffineTransform
 from numpy import pad
 from skimage import io
+import torch
 
 # Generate a simple chessboard image
 def create_chessboard(size=100, block_size=10):
@@ -20,7 +21,7 @@ def generate_strain_tensors():
     strain_yy = np.array([-0.5, -0.75, 1.5, 2])  # Stretching values
     # shear_xy1 = np.linspace(-0.9, -0.5, 2)   # Shear strain
     # shear_xy2 = np.linspace(0.5, 0.9, 2)   # Shear strain
-    shear_xy = np.array([-0.8,-0.4,0.4,0.8])
+    shear_xy = np.array([-0.6,-0.3,0.3,0.6])
     tensors = [
         (xx, yy, xy)
         for xx in strain_xx
@@ -242,7 +243,8 @@ def apply_corotated_strain_with_keypoints(image, keypoints, s):
     F_strain_h[:2, :2] = F_strain
 
     # Center image for proper transformation
-    center = np.array(image.shape[:2]) / 2
+    H,W = image.shape[:2]
+    center = np.array([W,H]) / 2
     translation_to_origin = np.eye(3)
     translation_to_origin[:2, 2] = -center
 
@@ -264,6 +266,8 @@ def apply_corotated_strain_with_keypoints(image, keypoints, s):
     )
 
     # Apply the same transformation to the keypoints
+    # Flip the coordinates of the keypoints
+
     keypoints_h = np.hstack((keypoints, np.ones((keypoints.shape[0], 1))))
     transformed_keypoints = keypoints_h @ affine_matrix.T
     transformed_keypoints = transformed_keypoints[:, :2] / transformed_keypoints[:, 2:3]
