@@ -8,15 +8,21 @@ from PIL import Image
 import cv2
 import numpy as np
 from Affine_Transformations import generate_strain_tensors, apply_corotated_strain_with_keypoints
+import time
+
+# Set random seed
+torch.manual_seed(0)
+np.random.seed(0)
 
 # Define parameters
 image_dir = "data/data"
 deformed_dir = "data/transformed_data"
-deformations_per_kp = 8
-kp_per_image = 8
+deformations_per_image = 8
+kp_per_deformation = 8
+kp_per_image = deformations_per_image * kp_per_deformation
 num_images = 1000
-margin = 0.5
-samples = 100
+margin = 0.2
+samples = 1000
 
 # Create detector and descriptor instances
 device = get_best_device()
@@ -28,9 +34,9 @@ image_names = os.listdir(image_dir)
 # image_paths = sorted([os.path.join(image_dir, file) for file in image_names])
 
 # Initialize arrays to store descriptors
-non_deformed_descriptors = np.zeros((len(image_names)*kp_per_image*deformations_per_kp, 256))
-deformed_descriptors = np.zeros((len(image_names)*kp_per_image*deformations_per_kp, 256))
-deformation_idx = np.random.randint(0,64,size=(num_images,kp_per_image,deformations_per_kp))
+non_deformed_descriptors = np.zeros((len(image_names)*deformations_per_image*kp_per_deformation, 256))
+deformed_descriptors = np.zeros((len(image_names)*deformations_per_image*kp_per_deformation, 256))
+deformation_idx = np.random.randint(0,64,size=(num_images,deformations_per_image))
 deformation_grid = generate_strain_tensors()
 
 # Loop over image_paths
@@ -53,37 +59,53 @@ for i, image_name in enumerate(image_names):
         keypoints = keypoints[:kp_per_image]
     else:
         keypoints = (torch.rand((kp_per_image, 2)) * 2 - 1) * margin
-
-    # Convert keypoints to pixel coordinates
-    pixel_keypoints = detector.to_pixel_coords(keypoints.cpu(), H, W)
+    indices = torch.randperm(keypoints.size(0))
+    keypoints = keypoints[indices]
 
     # Store non-deformed descriptors
-    print(keypoints)
-    description = descriptor.describe_keypoints_from_path(image_path, keypoints[None,...])["descriptions"].squeeze()
-    non_deformed_descriptors[i*kp_per_image*deformations_per_kp:(i+1)*kp_per_image*deformations_per_kp] = np.repeat(description.cpu(),deformations_per_kp,axis=0)
+    # print(keypoints)
+    description = descriptor.describe_keypoints_from_path(image_path, keypoints[None,...].to(device))["descriptions"].squeeze()
+    non_deformed_descriptors[i*kp_per_deformation*deformations_per_image:(i+1)*kp_per_deformation*deformations_per_image] = description.cpu()
 
-    # Loop over keypoints
-    for j, kp in enumerate(keypoints.cpu()):
+    # Extract Deformations
+    deformations = np.array(deformation_grid)[deformation_idx[i,:]]
+
+    keypoints = keypoints.reshape(deformations_per_image, kp_per_deformation, 2)
+
+    # Loop over deformations
+    for j, (deformation, keypoint_set) in enumerate(zip(deformations,keypoints)):
+
+        # Convert keypoint to pixel coordinates
+        pixel_keypoint_set = detector.to_pixel_coords(keypoint_set.cpu(), H, W)
         
-        # Get deformations for this keypoint
-        deformations = np.array(deformation_grid)[deformation_idx[i,j,:]]
+        # Prep Image
+        np_image = np.array(image)[...,::-1]
+        
+        # Apply deformation
+        deformed_image, pixel_deformed_keypoint_set = apply_corotated_strain_with_keypoints(np_image, pixel_keypoint_set, deformation)
+        deformed_keypoint_set = detector.to_normalized_coords(torch.tensor(pixel_deformed_keypoint_set), H, W).to(torch.float32)[0]
+        # deformed_image_path = os.path.join(deformed_dir, image_name)
+        # cv2.imwrite(deformed_image_path, deformed_image)
 
-        # Loop over deformations
-        for k, deformation in enumerate(deformations):
+        # Get deformed descriptor without saving and reading the image
+        deformed_image = np.array(deformed_image, dtype=np.uint8)
+        deformed_image = descriptor.normalizer(torch.from_numpy(np.array(Image.fromarray(deformed_image).resize((W,H)))/255.).permute(2,0,1)).float().to(device)[None]
+        batch = {"image": deformed_image}
+        deformed_description_set = descriptor.describe_keypoints(batch, deformed_keypoint_set[None,...].to(device))["descriptions"].squeeze()
 
-            # Prep Image
-            np_image = np.array(image)[...,::-1]
+        # Store deformed descriptors
+        # print(deformed_keypoint)
+        # deformed_description = descriptor.describe_keypoints_from_path(deformed_image_path, deformed_keypoint[None,...].to(device))["descriptions"].squeeze()
+
+        # deformed_descriptors[i*kp_per_deformation*deformations_per_image + j*deformations_per_image + k] = deformed_description_set.cpu()
+        deformed_descriptors[i*kp_per_deformation*deformations_per_image + j*kp_per_deformation:i*kp_per_deformation*deformations_per_image + (j+1)*kp_per_deformation] = deformed_description_set.cpu()
+
+    if i % 10 == 0:
+        print(f"Processed {i} images")
             
-            # Apply deformation
-            deformed_image, pixel_deformed_keypoints = apply_corotated_strain_with_keypoints(np_image, pixel_keypoints, deformation)
-            deformed_keypoints = detector.to_normalized_coords(torch.tensor(pixel_deformed_keypoints), H, W).to(torch.float32)[0]
-            deformed_image_path = os.path.join(deformed_dir, image_name)
-            cv2.imwrite(deformed_image_path, deformed_image)
-
-            # Store deformed descriptors
-            print(deformed_keypoints)
-            deformed_description = descriptor.describe_keypoints_from_path(deformed_image_path, deformed_keypoints[None,...].to(device))["descriptions"].squeeze()
-            deformed_descriptors[i*kp_per_image*deformations_per_kp + j*deformations_per_kp + k] = deformed_description.cpu()
-            break
-        break
-    break
+        
+# Save descriptors
+torch_descriptors = torch.tensor(non_deformed_descriptors)
+torch_deformed_descriptors = torch.tensor(deformed_descriptors)
+torch_deformations = torch.tensor(deformation_idx)
+torch.save({'descriptors': torch_descriptors, 'deformed_descriptors': torch_deformed_descriptors, 'transformations': torch_deformations}, "data/DeDoDe_Descriptors_Dataset.pth")
