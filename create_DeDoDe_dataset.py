@@ -93,12 +93,13 @@ for i, image_name in enumerate(image_names):
         whole_pixel_keypoint_set = pixel_keypoint_set + torch.tensor([W//4, H//4]) + torch.tensor([wpadding, hpadding])
         
         # Apply deformation
-        deformed_image, whole_pixel_deformed_keypoint_set = apply_corotated_strain_with_keypoints(padded_np_image, whole_pixel_keypoint_set, deformation)
+        deformed_padded_image, whole_pixel_deformed_keypoint_set = apply_corotated_strain_with_keypoints(padded_np_image, whole_pixel_keypoint_set, deformation)
         pixel_deformed_keypoint_set = whole_pixel_deformed_keypoint_set - np.array([W//4, H//4]) - np.array([wpadding, hpadding])
         deformed_keypoint_set = detector.to_normalized_coords(torch.tensor(pixel_deformed_keypoint_set), h, w).to(torch.float32)[0]
 
         # Get deformed descriptor without saving and reading the image
-        deformed_image = np.array(deformed_image, dtype=np.uint8)
+        deformed_padded_image = np.array(deformed_padded_image, dtype=np.uint8)
+        deformed_image = deformed_padded_image[hpadding:-hpadding, wpadding:-wpadding, :]
         inner_deformed_image = deformed_image[H//4:3*H//4, W//4:3*W//4, :]
         inner_deformed_image = descriptor.normalizer(torch.from_numpy(np.array(Image.fromarray(inner_deformed_image).resize((w,h)))/255.).permute(2,0,1)).float().to(device)[None]
         deformed_batch = {"image": inner_deformed_image}
