@@ -12,4 +12,5 @@ venv
 test.py
 models
 **/.ipynb_checkpoints/
-Visualisations
+runs
+__pycache__/
