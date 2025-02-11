@@ -17,11 +17,11 @@ def create_chessboard(size=100, block_size=10):
 
  # Generate 125 strain tensors
 def generate_strain_tensors():
-    strain_xx = np.array([-0.5, -0.75, 1.5, 2])  # Stretching values
-    strain_yy = np.array([-0.5, -0.75, 1.5, 2])  # Stretching values
+    strain_xx = np.array([-0.5, -0.25, 0.5, 1.0])  # Stretching values
+    strain_yy = np.array([-0.5, -0.25, 0.5, 1.0])  # Stretching values
     # shear_xy1 = np.linspace(-0.9, -0.5, 2)   # Shear strain
     # shear_xy2 = np.linspace(0.5, 0.9, 2)   # Shear strain
-    shear_xy = np.array([-0.6,-0.3,0.3,0.6])
+    shear_xy = np.array([-0.4,-0.2,0.2,0.4])
     tensors = [
         (xx, yy, xy)
         for xx in strain_xx
@@ -237,6 +237,8 @@ def apply_corotated_strain_with_keypoints(image, keypoints, s):
     F = deformation_gradient_from_strain(strain_tensor)
 
     R, F_strain = polar_decomposition(F)
+
+    # print(f'F_strain: {F_strain}')
 
     # Build affine transform matrix (add homogeneous coordinates)
     F_strain_h = np.eye(3)
