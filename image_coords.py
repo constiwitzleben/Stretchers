@@ -28,7 +28,20 @@ image = Image.open(im_path)
 W,H = image.size
 print(W,H)
 np_image = np.array(image)
-np_inner_image = np_image[H//4:3*H//4, W//4:3*W//4, :]
+
+hpadding = 3*H
+wpadding = 3*W
+padded_np_image = np.pad(np_image, ((hpadding, hpadding), (wpadding, wpadding), (0, 0)), mode='reflect')
+print(padded_np_image.shape)
+
+inner_cutoff = 2
+double_cutoff = inner_cutoff*2
+uH = (inner_cutoff - 1) * H // double_cutoff
+lH = (inner_cutoff + 1) * H // double_cutoff
+uW = (inner_cutoff - 1) * W // double_cutoff
+lW = (inner_cutoff + 1) * W // double_cutoff
+
+np_inner_image = np_image[uH:lH, uW:lW, :]
 h, w = np_inner_image.shape[:2]
 print(h,w)
 inner_image = Image.fromarray(np_inner_image)
@@ -69,16 +82,17 @@ print(descriptors_1['descriptions'].shape)
 tensors = generate_strain_tensors()
 # print(tensors)
 np_image = np.array(image)
+padded_np_image = np.array(padded_np_image)
 # print(im.size)
 # print(np_image.shape)
 # deformed_image = apply_corotated_strain(np_image, tensors[0])
 # deformed_image = apply_corotated_strain(np_image[...,::-1], tensors[0])
-tensor = np.array([-0.25,-0.25,0.0])
-kps1_pixel_full = kps1_pixel[0] + torch.tensor([W//4, H//4])
-deformed_image, kps2_pixel_full = apply_corotated_strain_with_keypoints(np_image, kps1_pixel_full, tensor)
+tensor = np.array([-0.5,-0.5,0.4])
+kps1_pixel_full = kps1_pixel[0] + torch.tensor([uW, uH]) + torch.tensor([wpadding, hpadding])
+deformed_padded_image, kps2_pixel_full = apply_corotated_strain_with_keypoints(padded_np_image, kps1_pixel_full, tensor)
 # print(tensors[22])
 
-kps2_pixel = kps2_pixel_full - np.array([W//4, H//4])
+kps2_pixel = kps2_pixel_full - np.array([uW, uH]) - np.array([wpadding, hpadding])
 kps2 = detector.to_normalized_coords(torch.tensor(kps2_pixel), h, w)
 
 
@@ -88,8 +102,9 @@ kps2 = detector.to_normalized_coords(torch.tensor(kps2_pixel), h, w)
 
 
 
-deformed_image = np.array(deformed_image, dtype=np.uint8)
-inner_deformed_image = deformed_image[H//4:3*H//4, W//4:3*W//4, :]
+deformed_padded_image = np.array(deformed_padded_image, dtype=np.uint8)
+deformed_image = deformed_padded_image[hpadding:-hpadding, wpadding:-wpadding, :]
+inner_deformed_image = deformed_image[uH:lH, uW:lW, :]
 im2 = Image.fromarray(inner_deformed_image)
 inner_deformed_image = descriptor.normalizer(torch.from_numpy(np.array(Image.fromarray(inner_deformed_image).resize((w,h)))/255.).permute(2,0,1)).float().to(device)[None]
 

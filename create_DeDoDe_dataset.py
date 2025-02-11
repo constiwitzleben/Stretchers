@@ -47,9 +47,15 @@ for i, image_name in enumerate(image_names):
     image = Image.open(image_path)
     W, H = image.size
     np_image = np.array(image)
+
+    # Extract inner image
     np_inner_image = np_image[H//4:3*H//4, W//4:3*W//4, :]
     h, w = np_inner_image.shape[:2]
-    
+
+    # Create Padded image
+    hpadding = 3*H
+    wpadding = 3*W
+    padded_np_image = np.pad(np_image, ((hpadding, hpadding), (wpadding, wpadding), (0, 0)), mode='reflect')
 
     # Detect keypoints
     np_inner_image = np.array(np_inner_image,dtype=np.uint8)
@@ -71,13 +77,12 @@ for i, image_name in enumerate(image_names):
 
     # Store non-deformed descriptors
     description = descriptor.describe_keypoints(batch, keypoints[None,...].to(device))["descriptions"].squeeze()
-
-    # description = descriptor.describe_keypoints_from_path(image_path, keypoints[None,...].to(device))["descriptions"].squeeze()
     non_deformed_descriptors[i*kp_per_deformation*deformations_per_image:(i+1)*kp_per_deformation*deformations_per_image] = description.cpu()
 
     # Extract Deformations
     deformations = np.array(deformation_grid)[deformation_idx[i,:]]
 
+    # Reshape keypoints
     keypoints = keypoints.reshape(deformations_per_image, kp_per_deformation, 2)
 
     # Loop over deformations
@@ -85,14 +90,12 @@ for i, image_name in enumerate(image_names):
 
         # Convert keypoint to pixel coordinates
         pixel_keypoint_set = detector.to_pixel_coords(keypoint_set.cpu(), h, w)
-        whole_pixel_keypoint_set = pixel_keypoint_set + torch.tensor([W//4, H//4])
+        whole_pixel_keypoint_set = pixel_keypoint_set + torch.tensor([W//4, H//4]) + torch.tensor([wpadding, hpadding])
         
         # Apply deformation
-        deformed_image, whole_pixel_deformed_keypoint_set = apply_corotated_strain_with_keypoints(np_image, whole_pixel_keypoint_set, deformation)
-        pixel_deformed_keypoint_set = whole_pixel_deformed_keypoint_set - np.array([W//4, H//4])
+        deformed_image, whole_pixel_deformed_keypoint_set = apply_corotated_strain_with_keypoints(padded_np_image, whole_pixel_keypoint_set, deformation)
+        pixel_deformed_keypoint_set = whole_pixel_deformed_keypoint_set - np.array([W//4, H//4]) - np.array([wpadding, hpadding])
         deformed_keypoint_set = detector.to_normalized_coords(torch.tensor(pixel_deformed_keypoint_set), h, w).to(torch.float32)[0]
-        # deformed_image_path = os.path.join(deformed_dir, image_name)
-        # cv2.imwrite(deformed_image_path, deformed_image)
 
         # Get deformed descriptor without saving and reading the image
         deformed_image = np.array(deformed_image, dtype=np.uint8)
@@ -100,10 +103,6 @@ for i, image_name in enumerate(image_names):
         inner_deformed_image = descriptor.normalizer(torch.from_numpy(np.array(Image.fromarray(inner_deformed_image).resize((w,h)))/255.).permute(2,0,1)).float().to(device)[None]
         deformed_batch = {"image": inner_deformed_image}
         deformed_description_set = descriptor.describe_keypoints(deformed_batch, deformed_keypoint_set[None,...].to(device))["descriptions"].squeeze()
-
-        # Store deformed descriptors
-        # print(deformed_keypoint)
-        # deformed_description = descriptor.describe_keypoints_from_path(deformed_image_path, deformed_keypoint[None,...].to(device))["descriptions"].squeeze()
 
         # deformed_descriptors[i*kp_per_deformation*deformations_per_image + j*deformations_per_image + k] = deformed_description_set.cpu()
         deformed_descriptors[i*kp_per_deformation*deformations_per_image + j*kp_per_deformation:i*kp_per_deformation*deformations_per_image + (j+1)*kp_per_deformation] = deformed_description_set.cpu()
