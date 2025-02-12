@@ -17,11 +17,11 @@ def create_chessboard(size=100, block_size=10):
 
  # Generate 125 strain tensors
 def generate_strain_tensors():
-    strain_xx = np.array([-0.5, -0.25, 0.5, 1.0])  # Stretching values
-    strain_yy = np.array([-0.5, -0.25, 0.5, 1.0])  # Stretching values
+    strain_xx = np.array([-0.5, -0.25, 0.0, 0.5, 1.0])  # Stretching values
+    strain_yy = np.array([-0.5, -0.25, 0.0, 0.5, 1.0])  # Stretching values
     # shear_xy1 = np.linspace(-0.9, -0.5, 2)   # Shear strain
     # shear_xy2 = np.linspace(0.5, 0.9, 2)   # Shear strain
-    shear_xy = np.array([-0.4,-0.2,0.2,0.4])
+    shear_xy = np.array([-0.4, -0.2, 0.0, 0.2, 0.4])
     tensors = [
         (xx, yy, xy)
         for xx in strain_xx
@@ -232,6 +232,28 @@ plt.show()
 
 def apply_corotated_strain_with_keypoints(image, keypoints, s):
 
+    H,W = image.shape[:2]
+
+    deformation = np.array(s)
+
+    # Check if padding is needed
+    padding = None
+    if deformation[2] >= 0.4:
+        if deformation[0] + deformation[1] <= -1.0:
+            padding = 1
+            print('padding with 1')
+        elif deformation[0] + deformation[1] <= -0.75:
+            padding = 0.2
+            print('padding with 0.2')
+    
+
+    if padding is not None:
+        hpadding = int(padding*H)
+        wpadding = int(padding*W)
+        image = np.pad(image, ((hpadding, hpadding), (wpadding, wpadding), (0, 0)), mode='reflect')
+
+        keypoints = keypoints + torch.tensor([wpadding, hpadding])
+
     strain_tensor = np.array([[s[0], s[2]], 
                               [s[2], s[1]]])
     F = deformation_gradient_from_strain(strain_tensor)
@@ -273,6 +295,11 @@ def apply_corotated_strain_with_keypoints(image, keypoints, s):
     keypoints_h = np.hstack((keypoints, np.ones((keypoints.shape[0], 1))))
     transformed_keypoints = keypoints_h @ affine_matrix.T
     transformed_keypoints = transformed_keypoints[:, :2] / transformed_keypoints[:, 2:3]
+
+    if padding is not None:
+        transformed_keypoints = transformed_keypoints - np.array([wpadding, hpadding])
+        transformed_image = transformed_image[hpadding:-hpadding, wpadding:-wpadding, :]
+
 
     return transformed_image, transformed_keypoints[None, :, :]
 

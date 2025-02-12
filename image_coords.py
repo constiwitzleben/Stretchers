@@ -10,7 +10,7 @@ from DeDoDe.utils import get_best_device
 import os
 import cv2
 from Affine_Transformations import generate_strain_tensors, deformation_gradient_from_strain, polar_decomposition, apply_corotated_strain, apply_corotated_strain_with_keypoints, apply_strain, apply_strain_to_keypoints
-
+import time
 
 os.environ["PYTORCH_ENABLE_MPS_FALLBACK"] = "1"
 device = get_best_device()
@@ -29,12 +29,7 @@ W,H = image.size
 print(W,H)
 np_image = np.array(image)
 
-hpadding = 3*H
-wpadding = 3*W
-padded_np_image = np.pad(np_image, ((hpadding, hpadding), (wpadding, wpadding), (0, 0)), mode='reflect')
-print(padded_np_image.shape)
-
-inner_cutoff = 2
+inner_cutoff = 4
 double_cutoff = inner_cutoff*2
 uH = (inner_cutoff - 1) * H // double_cutoff
 lH = (inner_cutoff + 1) * H // double_cutoff
@@ -43,7 +38,7 @@ lW = (inner_cutoff + 1) * W // double_cutoff
 
 np_inner_image = np_image[uH:lH, uW:lW, :]
 h, w = np_inner_image.shape[:2]
-print(h,w)
+print(w,h)
 inner_image = Image.fromarray(np_inner_image)
 
 np_inner_image = np.array(np_inner_image,dtype=np.uint8)
@@ -54,7 +49,7 @@ keypoints, P = detections["keypoints"], detections["confidence"]
 
 kps1 = keypoints.cpu()[0]
 # print(kps1)
-margin = 0.2
+margin = 0.3
 condition = (np.abs(kps1[:, 0]) <= margin) & (np.abs(kps1[:, 1]) <= margin)
 kps1 = kps1[condition]
 kps1 = kps1[:8]
@@ -81,18 +76,20 @@ print(descriptors_1['descriptions'].shape)
 
 tensors = generate_strain_tensors()
 # print(tensors)
-np_image = np.array(image)
-padded_np_image = np.array(padded_np_image)
+# np_image = np.array(image)
+# padded_np_image = np.array(padded_np_image)
 # print(im.size)
 # print(np_image.shape)
 # deformed_image = apply_corotated_strain(np_image, tensors[0])
 # deformed_image = apply_corotated_strain(np_image[...,::-1], tensors[0])
-tensor = np.array([-0.5,-0.5,0.4])
-kps1_pixel_full = kps1_pixel[0] + torch.tensor([uW, uH]) + torch.tensor([wpadding, hpadding])
-deformed_padded_image, kps2_pixel_full = apply_corotated_strain_with_keypoints(padded_np_image, kps1_pixel_full, tensor)
-# print(tensors[22])
+tensor = np.array([0.5,0.5,0.4])
+kps1_pixel_full = kps1_pixel[0] + torch.tensor([uW, uH]) #+ torch.tensor([wpadding, hpadding])
+start = time.time()
+deformed_image, kps2_pixel_full = apply_corotated_strain_with_keypoints(np_image, kps1_pixel_full, tensor)
+end = time.time()
+print(f'Time taken for transformation:{end-start}')
 
-kps2_pixel = kps2_pixel_full - np.array([uW, uH]) - np.array([wpadding, hpadding])
+kps2_pixel = kps2_pixel_full - np.array([uW, uH]) #- np.array([wpadding, hpadding])
 kps2 = detector.to_normalized_coords(torch.tensor(kps2_pixel), h, w)
 
 
@@ -102,8 +99,8 @@ kps2 = detector.to_normalized_coords(torch.tensor(kps2_pixel), h, w)
 
 
 
-deformed_padded_image = np.array(deformed_padded_image, dtype=np.uint8)
-deformed_image = deformed_padded_image[hpadding:-hpadding, wpadding:-wpadding, :]
+deformed_image = np.array(deformed_image, dtype=np.uint8)
+# deformed_image = deformed_padded_image[hpadding:-hpadding, wpadding:-wpadding, :]
 inner_deformed_image = deformed_image[uH:lH, uW:lW, :]
 im2 = Image.fromarray(inner_deformed_image)
 inner_deformed_image = descriptor.normalizer(torch.from_numpy(np.array(Image.fromarray(inner_deformed_image).resize((w,h)))/255.).permute(2,0,1)).float().to(device)[None]
@@ -113,13 +110,13 @@ transformed_image = draw_kpts(im2, torch.tensor(kps2_pixel[0]))
 
 deformed_batch = {"image": inner_deformed_image}
 descriptors_2 = descriptor.describe_keypoints(deformed_batch, kps2.float().to(device))
-print(descriptors_2['descriptions'].shape)
+# print(descriptors_2['descriptions'].shape)
 
-print(torch.cdist(descriptors_1['descriptions'], descriptors_2['descriptions']))
-print(torch.cdist(descriptors_1['descriptions'], descriptors_2['descriptions']).shape)
+# print(torch.cdist(descriptors_1['descriptions'], descriptors_2['descriptions']))
+# print(torch.cdist(descriptors_1['descriptions'], descriptors_2['descriptions']).shape)
 
 normed1 = torch.nn.functional.normalize(descriptors_1['descriptions'][0], p=2, dim=1)
-print(normed1)
+# print(normed1)
 normed2 = torch.nn.functional.normalize(descriptors_2['descriptions'][0], p=2, dim=1)
 print(torch.mm(normed1, normed2.T))
 
