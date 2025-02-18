@@ -10,7 +10,6 @@ grayscale_to_rgb.py
 create_DeDoDe_dataset copy.py
 venv
 test.py
-models
 **/.ipynb_checkpoints/
 runs
 __pycache__/
