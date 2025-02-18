@@ -238,7 +238,7 @@ def apply_corotated_strain_with_keypoints(image, keypoints, s):
 
     # Check if padding is needed
     padding = None
-    if deformation[2] >= 0.4:
+    if deformation[2] >= 0.4 or deformation[2] <= -0.4:
         if deformation[0] + deformation[1] <= -1.0:
             padding = 1
             print('padding with 1')

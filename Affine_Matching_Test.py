@@ -9,6 +9,7 @@ import os
 from Affine_Transformations import apply_corotated_strain_with_keypoints, generate_strain_tensors
 from models import Embedded_Conditional_Residual_MLP
 import time
+from matchers.max_similarity import StretcherDualSoftMaxMatcher
 
 def draw_matches(im_A, kpts_A, im_B, kpts_B):    
     kpts_A = [cv2.KeyPoint(x,y,1.) for x,y in kpts_A.cpu().numpy()]
@@ -24,18 +25,20 @@ device = get_best_device()
 detector = dedode_detector_L(weights = torch.load("dedode_detector_L.pth", map_location = device))
 descriptor = dedode_descriptor_B(weights = torch.load("dedode_descriptor_B.pth", map_location = device))
 matcher = DualSoftMaxMatcher()
+stretcher_matcher = StretcherDualSoftMaxMatcher()
 
 # Extract image info
 im_path = "data/data/000000000042.jpg"
 image = Image.open(im_path)
 W, H = image.size
+print(W,H)
 np_image = np.array(image)
 
 # Define parameters
-inv_inner_cutoff = 2
+inv_inner_cutoff = 1
 double_cutoff = inv_inner_cutoff*2
-num_keypoints = 100
-deformation = np.array([0.5,0.5,0.2])
+num_keypoints = 1000
+deformation = np.array([1.0,1.0,0])
 
 # Extract inner image
 uH = (inv_inner_cutoff - 1) * H // double_cutoff
@@ -72,7 +75,7 @@ deformed_descriptions = descriptor.describe_keypoints(deformed_batch, deformed_k
 print(f'Base Keypoints: {base_keypoints}')
 print(f'Deformed Keypoints: {deformed_keypoints}')
 
-# Match Keypoints
+# Match Keypoints     
 matches_base, matches_deformed, batch_ids = matcher.match(base_keypoints, base_descriptions,
     deformed_keypoints, deformed_descriptions,
     P_A = base_P, P_B = deformed_P,
@@ -91,12 +94,21 @@ model.load_state_dict(torch.load("models/single_transformation_model.pth",map_lo
 model.eval()
 start = time.time()
 with torch.no_grad():
-    modeled_descriptions = np.array([model(base_descriptions.float(), torch.tensor(tensor).to(torch.float32).to(device).repeat(num_keypoints,1)).cpu() for tensor in generate_strain_tensors()])
+    stretched_descriptions = np.array([model(base_descriptions.float(), torch.tensor(tensor).to(torch.float32).to(device).repeat(num_keypoints,1)).cpu() for tensor in generate_strain_tensors()])
+stretched_descriptions = torch.tensor(stretched_descriptions).to(device)                
 end = time.time()
 print(f'Time taken for transformation:{end-start}')
-print(f'Modeled Descriptions: {modeled_descriptions.shape}')
+print(f'Modeled Descriptions: {stretched_descriptions.shape}')
 
-# Find Maximum Match per Keypoint
+print(f'stretched_descriptions: {stretched_descriptions.device}')
+print(f'deformed_descriptions: {deformed_descriptions.device}')
 
+# Run Matching for Stretched Descriptions
+stretched_matches, matches_deformed, batch_ids = stretcher_matcher.match(base_keypoints, stretched_descriptions,
+        deformed_keypoints, deformed_descriptions,
+        P_A = base_P, P_B = deformed_P,
+        normalize = False, inv_temp=20, threshold = 0.01)#Increasing threshold -> fewer matches, fewer outliers
 
-# Run Matching Algorithm
+stretched_matches, matches_deformed = stretcher_matcher.to_pixel_coords(stretched_matches, matches_deformed, h, w, h, w)
+
+Image.fromarray(draw_matches(np_inner_image, stretched_matches.cpu(), inner_deformed_image, matches_deformed.cpu())).save("Visualisations/affine_matches_stretched.png")
