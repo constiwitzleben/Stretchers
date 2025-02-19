@@ -5,11 +5,11 @@ from DeDoDe.utils import *
 from PIL import Image
 import numpy as np
 import os
-from util.Affine_Transformations import apply_corotated_strain_with_keypoints, generate_strain_tensors
+from util.Affine_Transformations import apply_corotated_strain_with_keypoints, generate_strain_tensors, transform_keypoints
 from models import Embedded_Conditional_Residual_MLP
 import time
 from matchers.max_similarity import StretcherDualSoftMaxMatcher
-from util.matching import draw_matches
+from util.matching import draw_matches, draw_matches_with_scores
 from util.dedode import detect_and_describe
 
 os.environ["PYTORCH_ENABLE_MPS_FALLBACK"] = "1"
@@ -54,14 +54,22 @@ deformed_base_keypoints = detector.to_normalized_coords(torch.tensor(pixel_defor
 deformed_keypoints, deformed_P, deformed_descriptions = detect_and_describe(inner_deformed_image, detector, descriptor, device, num_keypoints)
 
 # Match Keypoints     
-matches_base, matches_deformed, batch_ids = matcher.match(base_keypoints, base_descriptions,
+matches_base, deformed_matches, batch_ids = matcher.match(base_keypoints, base_descriptions,
     deformed_keypoints, deformed_descriptions,
     P_A = base_P, P_B = deformed_P,
     normalize = True, inv_temp=20, threshold = 0.01)#Increasing threshold -> fewer matches, fewer outliers
 
-matches_base, matches_deformed = matcher.to_pixel_coords(matches_base, matches_deformed, h, w, h, w)
+matches_base, deformed_matches = matcher.to_pixel_coords(matches_base, deformed_matches, h, w, h, w)
 
-Image.fromarray(draw_matches(np_inner_image, matches_base.cpu(), inner_deformed_image, matches_deformed.cpu())).save("Visualisations/affine_matches_baseline.png")
+whole_pixel_matches = matches_base.cpu() + torch.tensor([uW, uH])
+whole_pixel_gt_deformed_matches = transform_keypoints(np_image, whole_pixel_matches, deformation)
+pixel_gt_deformed_keypoints = whole_pixel_gt_deformed_matches - np.array([uW, uH])
+
+distances = (deformed_matches.cpu() - pixel_gt_deformed_keypoints).norm(dim=2)[0]
+accuracy = (distances < 5).sum().item() / len(distances)
+print(f'Accuracy before Stretching: {accuracy} ({(distances < 5).sum().item()} / {len(distances)})')
+
+Image.fromarray(draw_matches(np_inner_image, matches_base.cpu(), inner_deformed_image, deformed_matches.cpu())).save("Visualisations/affine_matches_baseline.png")
 
 # Run Model on Base Descriptions
 input_dim = 256
@@ -78,11 +86,19 @@ end = time.time()
 print(f'Time taken for transformation:{end-start}')
 
 # Run Matching for Stretched Descriptions
-stretched_matches, matches_deformed, batch_ids = stretcher_matcher.match(base_keypoints, stretched_descriptions,
+stretched_matches, deformed_matches, batch_ids = stretcher_matcher.match(base_keypoints, stretched_descriptions,
         deformed_keypoints, deformed_descriptions,
         P_A = base_P, P_B = deformed_P,
         normalize = False, inv_temp=20, threshold = 0.01)#Increasing threshold -> fewer matches, fewer outliers
 
-stretched_matches, matches_deformed = stretcher_matcher.to_pixel_coords(stretched_matches, matches_deformed, h, w, h, w)
+stretched_matches, deformed_matches = stretcher_matcher.to_pixel_coords(stretched_matches, deformed_matches, h, w, h, w)
 
-Image.fromarray(draw_matches(np_inner_image, stretched_matches.cpu(), inner_deformed_image, matches_deformed.cpu())).save("Visualisations/affine_matches_stretched.png")
+whole_pixel_stretched_matches = stretched_matches.cpu() + torch.tensor([uW, uH])
+whole_pixel_gt_deformed_matches = transform_keypoints(np_image, whole_pixel_stretched_matches, deformation)
+pixel_gt_deformed_keypoints = whole_pixel_gt_deformed_matches - np.array([uW, uH])
+
+distances = (deformed_matches.cpu() - pixel_gt_deformed_keypoints).norm(dim=2)[0]
+accuracy = (distances < 5).sum().item() / len(distances)
+print(f'Accuracy after Stretching: {accuracy} ({(distances < 5).sum().item()} / {len(distances)})')
+
+Image.fromarray(draw_matches(np_inner_image, stretched_matches.cpu(), inner_deformed_image, deformed_matches.cpu())).save("Visualisations/affine_matches_stretched.png")

@@ -304,6 +304,61 @@ def apply_corotated_strain_with_keypoints(image, keypoints, s):
 
     return transformed_image, transformed_keypoints[None, :, :]
 
+def transform_keypoints(image, keypoints, s):
+
+    H,W = image.shape[:2]
+
+    deformation = np.array(s)
+
+    # Check if padding is needed
+    padding = None
+    if deformation[2] >= 0.4 or deformation[2] <= -0.4:
+        if deformation[0] + deformation[1] <= -1.0:
+            padding = 1
+            print('padding with 1')
+        elif deformation[0] + deformation[1] <= -0.75:
+            padding = 0.2
+            print('padding with 0.2')
+    
+    if padding is not None:
+        hpadding = int(padding*H)
+        wpadding = int(padding*W)
+        image = np.pad(image, ((hpadding, hpadding), (wpadding, wpadding), (0, 0)), mode='reflect')
+
+        keypoints = keypoints + torch.tensor([wpadding, hpadding])
+
+    strain_tensor = np.array([[s[0], s[2]], 
+                              [s[2], s[1]]])
+    F = deformation_gradient_from_strain(strain_tensor)
+
+    R, F_strain = polar_decomposition(F)
+
+    # print(f'F_strain: {F_strain}')
+
+    # Build affine transform matrix (add homogeneous coordinates)
+    F_strain_h = np.eye(3)
+    F_strain_h[:2, :2] = F_strain
+
+    # Center image for proper transformation
+    H,W = image.shape[:2]
+    center = np.array([W,H]) / 2
+    translation_to_origin = np.eye(3)
+    translation_to_origin[:2, 2] = -center
+
+    translation_back = np.eye(3)
+    translation_back[:2, 2] = center
+
+    # Combine transformations
+    affine_matrix = translation_back @ F_strain_h @ translation_to_origin
+
+    keypoints_h = np.hstack((keypoints, np.ones((keypoints.shape[0], 1))))
+    transformed_keypoints = keypoints_h @ affine_matrix.T
+    transformed_keypoints = transformed_keypoints[:, :2] / transformed_keypoints[:, 2:3]
+
+    if padding is not None:
+        transformed_keypoints = transformed_keypoints - np.array([wpadding, hpadding])
+
+    return transformed_keypoints[None, :, :]
 
 def apply_strain_to_keypoints(keypoints, s):
     strain_tensor = np.array([[s[0], s[2]], 
