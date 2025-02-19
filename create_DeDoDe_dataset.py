@@ -7,7 +7,7 @@ from DeDoDe.utils import *
 from PIL import Image
 import cv2
 import numpy as np
-from Affine_Transformations import generate_strain_tensors, apply_corotated_strain_with_keypoints
+from Stretchers.util.Affine_Transformations import generate_strain_tensors, apply_corotated_strain_with_keypoints
 import time
 
 # Set random seed
@@ -29,8 +29,8 @@ double_cutoff = inv_inner_cutoff*2
 
 # Create detector and descriptor instances
 device = get_best_device()
-detector = dedode_detector_L(weights = torch.load("dedode_detector_L.pth", map_location = device))
-descriptor = dedode_descriptor_B(weights = torch.load("dedode_descriptor_B.pth", map_location = device))
+detector = dedode_detector_L(weights = torch.load("models/dedode_detector_L.pth", map_location = device))
+descriptor = dedode_descriptor_B(weights = torch.load("models/dedode_descriptor_B.pth", map_location = device))
 
 # Load image_paths
 image_names = os.listdir(image_dir)

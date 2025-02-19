@@ -9,13 +9,13 @@ from DeDoDe import dedode_detector_L, dedode_descriptor_B
 from DeDoDe.utils import get_best_device
 import os
 import cv2
-from Affine_Transformations import generate_strain_tensors, deformation_gradient_from_strain, polar_decomposition, apply_corotated_strain, apply_corotated_strain_with_keypoints, apply_strain, apply_strain_to_keypoints
+from Stretchers.util.Affine_Transformations import generate_strain_tensors, deformation_gradient_from_strain, polar_decomposition, apply_corotated_strain, apply_corotated_strain_with_keypoints, apply_strain, apply_strain_to_keypoints
 import time
 
 os.environ["PYTORCH_ENABLE_MPS_FALLBACK"] = "1"
 device = get_best_device()
-detector = dedode_detector_L(weights = torch.load("dedode_detector_L.pth", map_location = device))
-descriptor = dedode_descriptor_B(weights = torch.load("dedode_descriptor_B.pth", map_location = device))
+detector = dedode_detector_L(weights = torch.load("models/dedode_detector_L.pth", map_location = device))
+descriptor = dedode_descriptor_B(weights = torch.load("models/dedode_descriptor_B.pth", map_location = device))
 
 im_path = 'data/data/000000000042.jpg'
 # H = 784
