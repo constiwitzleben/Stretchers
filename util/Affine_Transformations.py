@@ -29,6 +29,20 @@ def generate_strain_tensors():
         for xy in shear_xy
     ]
     return tensors
+
+def generate_27_strain_tensors():
+    strain_xx = np.array([-0.5, 0.0, 1.0])  # Stretching values
+    strain_yy = np.array([-0.5, 0.0, 1.0])  # Stretching values
+    # shear_xy1 = np.linspace(-0.9, -0.5, 2)   # Shear strain
+    # shear_xy2 = np.linspace(0.5, 0.9, 2)   # Shear strain
+    shear_xy = np.array([-0.4, 0.0, 0.4])
+    tensors = [
+        (xx, yy, xy)
+        for xx in strain_xx
+        for yy in strain_yy
+        for xy in shear_xy
+    ]
+    return tensors
    
 
 # Perform polar decomposition
