@@ -4,7 +4,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
 from DeDoDe.utils import to_pixel_coords, to_normalized_coords
-from Affine_Transformations import generate_strain_tensors
+from util.Affine_Transformations import generate_strain_tensors
 
 def dual_softmax_matcher(stretched_descriptors: tuple['T','N','D'], base_descriptor: tuple['1','M','D'], inv_temperature = 1, normalize = False):
 
@@ -34,9 +34,9 @@ def dual_softmax_matcher(stretched_descriptors: tuple['T','N','D'], base_descrip
 
     print(f'Top 5 stretches for max similarity:')
     for i in range(5):
-        print(f'{tensors[top5_indices[i]]}: {top5_percents[i]:.2f}%')
+        print(f'{tensors[top5_indices[i]]}: {top5_percents[i]:.0f}%')
 
-    return P
+    return P, corr_indices
 
 class StretcherDualSoftMaxMatcher(nn.Module):        
     @torch.inference_mode()
@@ -53,7 +53,7 @@ class StretcherDualSoftMaxMatcher(nn.Module):
             inds = torch.cat([m[2] + b for b, m in enumerate(matches)])
             return matches_A, matches_B, inds
         
-        P = dual_softmax_matcher(descriptions_A, descriptions_B, 
+        P, corr_indices = dual_softmax_matcher(descriptions_A, descriptions_B, 
                                  normalize = normalize, inv_temperature=inv_temp,
                                  )
         inds = torch.nonzero((P == P.max(dim=-1, keepdim = True).values) 
@@ -61,6 +61,26 @@ class StretcherDualSoftMaxMatcher(nn.Module):
         batch_inds = inds[:,0]
         matches_A = keypoints_A[batch_inds, inds[:,1]]
         matches_B = keypoints_B[batch_inds, inds[:,2]]
+
+        matched_transformations = corr_indices[inds[:,1],inds[:,2]]
+
+        stretch_counts = torch.bincount(matched_transformations)
+
+        top5_counts, top5_indices = torch.topk(stretch_counts, 5)
+        top5_percents = (top5_counts / stretch_counts.sum()) * 100
+
+        tensors = np.array(generate_strain_tensors())
+
+        print(f'Top 5 stretches for matching:')
+        for i in range(5):
+            print(f'{tensors[top5_indices[i]]}: {top5_percents[i]:.0f}%')
+
+
+        # tensors = np.array(generate_strain_tensors())
+
+        # print(f'Top 5 stretches for max similarity:')
+        # for transformation, count in zip(unique_transformations, counts):
+        #     print(f'{tensors[transformation]}: {count}')
 
         return matches_A, matches_B, batch_inds
 

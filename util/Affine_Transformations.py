@@ -300,6 +300,7 @@ def apply_corotated_strain_with_keypoints(image, keypoints, s):
         transformed_keypoints = transformed_keypoints - np.array([wpadding, hpadding])
         transformed_image = transformed_image[hpadding:-hpadding, wpadding:-wpadding, :]
 
+    transformed_image = np.array(transformed_image, dtype=np.uint8)
 
     return transformed_image, transformed_keypoints[None, :, :]
 
