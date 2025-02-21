@@ -1,5 +1,8 @@
 import cv2
 import numpy as np
+from PIL import Image, ImageDraw, ImageFont
+import torch
+from util.Affine_Transformations import transform_keypoints
 
 def draw_matches(im_A, kpts_A, im_B, kpts_B):
     im_A = np.array(im_A, dtype=np.uint8)
@@ -36,3 +39,36 @@ def draw_matches_with_scores(im_A, kpts_A, im_B, kpts_B, distances, threshold=5)
 
     return matched_img
 
+def draw_matching_comparison(img_baseline, img_stretched, image_dir):
+
+    # Ensure both images have the same height
+    w_baseline, h_baseline = img_baseline.size
+    w_stretched, h_stretched = img_stretched.size
+    new_width = max(w_baseline, w_stretched)
+    new_height = h_baseline + h_stretched + 20  # Adding a margin between images
+
+    # Create a blank canvas
+    combined_img = Image.new("RGB", (new_width, new_height), (255, 255, 255))
+    combined_img.paste(img_baseline, (0, 0))
+    combined_img.paste(img_stretched, (0, h_baseline + 20))  # Add a margin
+
+    # Add labels
+    draw = ImageDraw.Draw(combined_img)
+    font = ImageFont.load_default()  # You can replace this with a custom font if needed
+    draw.text((10, 10), "Baseline Matches", fill=(0, 0, 0), font=font)
+    draw.text((10, h_baseline + 30), "Stretched Matches", fill=(0, 0, 0), font=font)
+
+    # Save or display the combined image
+    combined_img.save(image_dir)
+    # combined_img.show()
+
+def print_matching_accuracy(base_matches, deformed_matches, np_image, deformation, uW, uH, threshold=5):
+    whole_pixel_stretched_matches = base_matches.cpu() + torch.tensor([uW, uH])
+    whole_pixel_gt_deformed_matches = transform_keypoints(np_image, whole_pixel_stretched_matches, deformation)
+    pixel_gt_deformed_keypoints = whole_pixel_gt_deformed_matches - np.array([uW, uH])
+
+    distances = (deformed_matches.cpu() - pixel_gt_deformed_keypoints).norm(dim=2)[0]
+    good = (distances < threshold).sum().item()
+    total = len(distances)
+    accuracy = good / total
+    print(f'Accuracy: {accuracy} ({good} / {total})')
