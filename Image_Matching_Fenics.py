@@ -9,9 +9,10 @@ from util.Affine_Transformations import apply_corotated_strain_with_keypoints, g
 from models import Embedded_Conditional_Residual_MLP, Embedded_Conditional_Fully_Residual_MLP
 import time
 from matchers.max_similarity import StretcherDualSoftMaxMatcher
-from util.matching import draw_matches, draw_matching_comparison
-from util.dedode import detect_and_describe
+from util.matching import draw_matches, draw_matching_comparison, draw_matches_with_scores
+from util.dedode import detect_and_describe, get_affine_deformed_descriptions
 from util.image import draw_keypoints
+from fenics_2D_elasticity_grid_proj import create_deformed_medical_image_pair, track_pixel_displacement
 
 os.environ["PYTORCH_ENABLE_MPS_FALLBACK"] = "1"
 device = get_best_device()
@@ -22,11 +23,16 @@ stretcher_matcher = StretcherDualSoftMaxMatcher()
 model_dir = "models/stretcher.pth"
 
 # Extract image info
-im_path = "data/nazim_images/vms_00000001.png"
+# im_path = "data/nazim_images/vms_00000001.png"
 # deformed_im_path = "data/nazim_images/vms_00000008.png"
-deformed_im_path = "data/nazim_images/vms_00000021.png"
+# deformed_im_path = "data/nazim_images/vms_00000021.png"
 # im_path = 'data/nazim_images/texture1.png'
 # deformed_im_path = 'data/nazim_images/texture2.png'
+im_path = 'data/medical_deformed/brain_lowres.png'
+deformed_im_path = 'data/medical_deformed/deformed.png'
+
+u, new_lx, new_ly = create_deformed_medical_image_pair(im_path,deformed_im_path)
+
 
 image = Image.open(im_path)
 deformed_image = Image.open(deformed_im_path)
@@ -41,6 +47,7 @@ if deformed_image.shape[-1] == 4:
 
 num_keypoints = 10000
 only27 = False
+good_match_threshold = 3
 
 start = time.time()
 
@@ -67,7 +74,7 @@ print(f'Deformed Description Time:{deformed_description_time}')
 start = time.time()
 
 # Match Keypoints     
-matches_base, matches_deformed, batch_ids = matcher.match(base_keypoints, base_descriptions,
+base_matches, deformed_matches, batch_ids = matcher.match(base_keypoints, base_descriptions,
     deformed_keypoints, deformed_descriptions,
     P_A = base_P, P_B = deformed_P,
     normalize = True, inv_temp=20, threshold = 0.01)#Increasing threshold -> fewer matches, fewer outliers
@@ -76,9 +83,16 @@ end = time.time()
 normal_matching_time = end - start
 print(f'Normal Matching Time:{normal_matching_time}')
 
-matches_base, matches_deformed = matcher.to_pixel_coords(matches_base, matches_deformed, H, W, dH, dW)
+base_matches, deformed_matches = matcher.to_pixel_coords(base_matches, deformed_matches, H, W, dH, dW)
 
-baseline_matches_image = Image.fromarray(draw_matches(image, matches_base.cpu(), deformed_image, matches_deformed.cpu()))
+gt_pixel_coords = np.array([track_pixel_displacement(u, pixel, W, H, dW, dH, 10, 10, new_lx, new_ly) for pixel in base_matches.cpu()])
+distances = (deformed_matches.cpu() - gt_pixel_coords).norm(dim=1)
+good = (distances < good_match_threshold).sum().item()
+total = len(distances)
+accuracy = good / total
+print(f'Accuracy: {accuracy} ({good} / {total})')
+
+baseline_matches_image = Image.fromarray(draw_matches_with_scores(image, base_matches.cpu(), deformed_image, deformed_matches.cpu(), distances, good_match_threshold))
 baseline_matches_image.save("Visualisations/matches_baseline.png")
 
 # Run Model on Base Descriptions
@@ -95,28 +109,44 @@ if only27:
 else:
     tensors = generate_strain_tensors()
 
+# start = time.time()
+# with torch.no_grad():
+#     stretched_descriptions = np.array([stretcher(base_descriptions.float(), torch.tensor(tensor).to(torch.float32).to(device).repeat(num_keypoints,1)).cpu() for tensor in tensors])
+# stretched_descriptions = torch.tensor(stretched_descriptions).to(device)                
+# end = time.time()
+# stretching_time = end - start
+# print(f'Stretching Time:{stretching_time}')
+
 start = time.time()
-with torch.no_grad():
-    stretched_descriptions = np.array([stretcher(base_descriptions.float(), torch.tensor(tensor).to(torch.float32).to(device).repeat(num_keypoints,1)).cpu() for tensor in tensors])
-stretched_descriptions = torch.tensor(stretched_descriptions).to(device)                
-end = time.time()
+stretched_descriptions = get_affine_deformed_descriptions(image, pixel_base_keypoints[0], tensors, detector, descriptor, device)
+stretched_descriptions = torch.tensor(stretched_descriptions).to(device)
 stretching_time = end - start
-print(f'Stretching Time:{stretching_time}')
+print(f'Affine Deformation Time:{stretching_time}')
+
+print(stretched_descriptions.shape)
+print(deformed_descriptions.shape)
 
 start = time.time()
 # Run Matching for Stretched Descriptions
-stretched_matches, matches_deformed, batch_ids = stretcher_matcher.match(base_keypoints, stretched_descriptions,
+stretched_matches, deformed_matches, batch_ids = stretcher_matcher.match(base_keypoints, stretched_descriptions,
         deformed_keypoints, deformed_descriptions,
         P_A = base_P, P_B = deformed_P,
-        normalize = True, inv_temp=20, threshold = 0.01, only27=only27)#Increasing threshold -> fewer matches, fewer outliers
+        normalize = True, inv_temp=20, threshold = 0.003, only27=only27)#Increasing threshold -> fewer matches, fewer outliers
 
 end = time.time()
 stretched_matching_time = end - start
 print(f'Stretched Matching Time:{stretched_matching_time}')
 
-stretched_matches, matches_deformed = stretcher_matcher.to_pixel_coords(stretched_matches, matches_deformed, H, W, dH, dW)
+stretched_matches, deformed_matches = stretcher_matcher.to_pixel_coords(stretched_matches, deformed_matches, H, W, dH, dW)
 
-stretcher_matches_image = Image.fromarray(draw_matches(image, stretched_matches.cpu(), deformed_image, matches_deformed.cpu()))
+gt_pixel_coords = np.array([track_pixel_displacement(u, pixel, W, H, dW, dH, 10, 10, new_lx, new_ly) for pixel in stretched_matches.cpu()])
+distances = (deformed_matches.cpu() - gt_pixel_coords).norm(dim=1)
+good = (distances < good_match_threshold).sum().item()
+total = len(distances)
+accuracy = good / total
+print(f'Accuracy after stretching: {accuracy} ({good} / {total})')
+
+stretcher_matches_image = Image.fromarray(draw_matches_with_scores(image, stretched_matches.cpu(), deformed_image, deformed_matches.cpu(), distances, good_match_threshold))
 stretcher_matches_image.save("Visualisations/matches_stretched.png")
 
 draw_matching_comparison(baseline_matches_image, stretcher_matches_image, "Visualisations/matches_comparison.png")

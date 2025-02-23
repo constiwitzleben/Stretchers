@@ -78,7 +78,9 @@ class StretcherDualSoftMaxMatcher(nn.Module):
 
         stretch_counts = torch.bincount(matched_transformations.to(torch.int64))
 
-        top5_counts, top5_indices = torch.topk(stretch_counts, 5)
+        index = 5 if len(stretch_counts) > 5 else len(stretch_counts)
+
+        top5_counts, top5_indices = torch.topk(stretch_counts, index)
         top5_percents = (top5_counts / stretch_counts.sum()) * 100
 
         if only27:
@@ -87,7 +89,7 @@ class StretcherDualSoftMaxMatcher(nn.Module):
             tensors = np.array(generate_strain_tensors())
 
         print(f'Top 5 stretches for matching:')
-        for i in range(5):
+        for i in range(index):
             print(f'{tensors[top5_indices[i]]}: {top5_percents[i]:.0f}%')
 
 

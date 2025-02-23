@@ -244,21 +244,24 @@ plt.show()
 # # Display images in pages of 25
 # display_images_in_pages(image, strain_tensors)
 
-def apply_corotated_strain_with_keypoints(image, keypoints, s):
+def apply_corotated_strain_with_keypoints(image, keypoints, s, dataset_mode=True):
 
     H,W = image.shape[:2]
+    output_shape = (H, W)
 
     deformation = np.array(s)
 
     # Check if padding is needed
     padding = None
-    if deformation[2] >= 0.4 or deformation[2] <= -0.4:
-        if deformation[0] + deformation[1] <= -1.0:
-            padding = 1
-            print('padding with 1')
-        elif deformation[0] + deformation[1] <= -0.75:
-            padding = 0.2
-            print('padding with 0.2')
+
+    if dataset_mode:
+        if deformation[2] >= 0.4 or deformation[2] <= -0.4:
+            if deformation[0] + deformation[1] <= -1.0:
+                padding = 1
+                print('padding with 1')
+            elif deformation[0] + deformation[1] <= -0.75:
+                padding = 0.2
+                print('padding with 0.2')
     
 
     if padding is not None:
@@ -293,6 +296,24 @@ def apply_corotated_strain_with_keypoints(image, keypoints, s):
     affine_matrix = translation_back @ F_strain_h @ translation_to_origin
     transform = AffineTransform(matrix=affine_matrix)
 
+    if dataset_mode == False:
+        corners = np.array([
+        [0, 0],  # Top-left
+        [0, W],  # Top-right
+        [H, W],  # Bottom-right
+        [H, 0]   # Bottom-left
+        ])
+        new_corners = transform(corners)
+        min_x, min_y = np.floor(new_corners.min(axis=0)).astype(int)
+        max_x, max_y = np.ceil(new_corners.max(axis=0)).astype(int)
+
+        # Compute new width and height
+        output_shape = (max_x - min_x, max_y - min_y)
+
+        offset_transform = AffineTransform(translation=(-min_x, -min_y))
+        transform = transform + offset_transform  # Combine transformations
+
+
     # Apply warp
     transformed_image = warp(
         image,
@@ -300,21 +321,23 @@ def apply_corotated_strain_with_keypoints(image, keypoints, s):
         mode="constant",
         cval=0.0,
         preserve_range=True,
-        order=3  # Bicubic interpolation
+        order=3, # Bicubic interpolation
+        output_shape=output_shape
     )
+
+    transformed_image = np.array(transformed_image, dtype=np.uint8)
 
     # Apply the same transformation to the keypoints
     # Flip the coordinates of the keypoints
 
-    keypoints_h = np.hstack((keypoints, np.ones((keypoints.shape[0], 1))))
-    transformed_keypoints = keypoints_h @ affine_matrix.T
-    transformed_keypoints = transformed_keypoints[:, :2] / transformed_keypoints[:, 2:3]
+    # keypoints_h = np.hstack((keypoints, np.ones((keypoints.shape[0], 1))))
+    # transformed_keypoints = keypoints_h @ affine_matrix.T
+    transformed_keypoints = transform(keypoints)
+    # transformed_keypoints = transformed_keypoints[:, :2] / transformed_keypoints[:, 2:3]
 
     if padding is not None:
         transformed_keypoints = transformed_keypoints - np.array([wpadding, hpadding])
         transformed_image = transformed_image[hpadding:-hpadding, wpadding:-wpadding, :]
-
-    transformed_image = np.array(transformed_image, dtype=np.uint8)
 
     return transformed_image, transformed_keypoints[None, :, :]
 

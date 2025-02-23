@@ -18,26 +18,34 @@ def draw_matches(im_A, kpts_A, im_B, kpts_B):
 def draw_matches_with_scores(im_A, kpts_A, im_B, kpts_B, distances, threshold=5):
     im_A = np.array(im_A, dtype=np.uint8)
     im_B = np.array(im_B, dtype=np.uint8)
-    kpts_A = [cv2.KeyPoint(x,y,1.) for x,y in kpts_A.cpu().numpy()]
-    kpts_B = [cv2.KeyPoint(x,y,1.) for x,y in kpts_B.cpu().numpy()]
-
-    distances = distances.cpu().numpy() if hasattr(distances, 'cpu') else np.array(distances)
-
-    # Classify matches
-    matches_good = []
-    matches_bad = []
     
-    for idx, distance in enumerate(distances):
-        match = cv2.DMatch(idx, idx, 0.)
-        if distance <= threshold:
-            matches_good.append(match)  # Good match (Green)
-        else:
-            matches_bad.append(match)   # Bad match (Red)
+    # Convert keypoints from tensors to OpenCV KeyPoints
+    kpts_A = [cv2.KeyPoint(x, y, 1.0) for x, y in kpts_A.cpu().numpy()]
+    kpts_B = [cv2.KeyPoint(x, y, 1.0) for x, y in kpts_B.cpu().numpy()]
+    
+    # Stack images horizontally for visualization
+    hA, wA = im_A.shape[:2]
+    hB, wB = im_B.shape[:2]
+    out_image = np.zeros((max(hA, hB), wA + wB, 3), dtype=np.uint8)
+    out_image[:hA, :wA] = im_A
+    out_image[:hB, wA:] = im_B
+    
+    # Draw matches manually with colored lines
+    for i, (kpA, kpB, dist) in enumerate(zip(kpts_A, kpts_B, distances)):
+        xA, yA = int(kpA.pt[0]), int(kpA.pt[1])
+        xB, yB = int(kpB.pt[0]) + wA, int(kpB.pt[1])  # Shift x-coordinates for B
+        
+        # Choose color based on threshold
+        color = (0, 255, 0) if dist < threshold else (0, 0, 255)  # Green if below, Red if above
+        
+        # Draw the match line
+        cv2.line(out_image, (xA, yA), (xB, yB), color, 2)
+        
+        # Draw keypoints
+        cv2.circle(out_image, (xA, yA), 4, (255, 0, 0), -1)  # Blue keypoints on A
+        cv2.circle(out_image, (xB, yB), 4, (255, 0, 0), -1)  # Blue keypoints on B
 
-    matched_img = cv2.drawMatches(im_A, kpts_A, im_B, kpts_B, matches_good, None, matchColor=(0, 0, 255))  # Green
-    matched_img = cv2.drawMatches(im_A, kpts_A, im_B, kpts_B, matches_bad, matched_img, matchColor=(255, 0, 0))  # Red
-
-    return matched_img
+    return out_image
 
 def draw_matching_comparison(img_baseline, img_stretched, image_dir):
 
