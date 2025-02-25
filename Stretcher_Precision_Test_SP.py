@@ -27,7 +27,7 @@ stretcher_matcher = StretcherDualSoftMaxMatcher()
 lightglue_matcher = LightGlue(features='superpoint').eval().to(device)
 
 num_keypoints = 10000
-stretch_type = 'larger'
+stretch_type = 'normal'
 good_match_threshold = 5
 chosen_keypoints = None
 model = 'superpoint'
@@ -40,12 +40,12 @@ elif stretch_type == 'larger':
 else:
     tensors = np.array(generate_strain_tensors())
 
-im_path = 'data/medical_deformed/brain_lowres.png'
-deformed_im_path = 'data/medical_deformed/brain_lowres_deformed.png'
+im_path = 'data/medical_deformed/pig_liver_to_elongate.png'
+deformed_im_path = 'data/medical_deformed/pig_liver_to_elongate_deformed.png'
 # im_path = 'data/medical_deformed/skull.png'
 # deformed_im_path = 'data/medical_deformed/skull_deformed.png'
 
-u, new_lx, new_ly = create_deformed_medical_image_pair(im_path, deformed_im_path, 15e6, 2e6 )
+u, new_lx, new_ly = create_deformed_medical_image_pair(im_path, deformed_im_path, 8e6, 1e6 )
 
 image = Image.open(im_path)
 deformed_image = Image.open(deformed_im_path)
@@ -139,7 +139,7 @@ elif model == 'superpoint':
 
 #----------------------------------------------------------------------------------
 #   Matching Baseline to Deformed
-#----------------------------------------------------------------------------------
+#---------------------------------------------------------------------------------- 
 
 if model == 'dedode':
     detected_deformed_keypoints, deformed_P, detected_deformed_descriptions = detect_and_describe(deformed_image, detector, descriptor, device, num_keypoints)
@@ -183,18 +183,63 @@ if matching == 'dualsoftmax':
     stretched_matches, deformed_matches, batch_ids = stretcher_matcher.match(pixel_base_keypoints[None].to(device), stretched_descriptions.to(device),
             pixel_detected_deformed_keypoints[None].to(device), detected_deformed_descriptions.to(device),
             P_A = base_P, P_B = deformed_P,
-            normalize = True, inv_temp=50, threshold = 0.06, stretch_type=stretch_type)
+            normalize = True, inv_temp=20, threshold = 0.05, stretch_type=stretch_type)
 elif matching == 'lightglue':
-    affined_pixel_base_keypoints = 
-    affined_base_descriptions = 
-    feats0 = {'keypoints': affined_pixel_base_keypoints.to(device), 'descriptors': affined_base_descriptions[None].to(device), 'image_size': base_img_size[None].to(device)}
-    feats1 = {'keypoints': pixel_detected_deformed_keypoints[None].to(device), 'descriptors': detected_deformed_descriptions[None].to(device), 'image_size': deformed_img_size[None].to(device)}
+    # shape = stretched_descriptions.shape
+    # affined_base_descriptions = stretched_descriptions.reshape(shape[0]*shape[1], shape[2])
+    # print(affined_base_descriptions.shape)
+    # affined_pixel_base_keypoints = pixel_base_keypoints.repeat(shape[0], 1)
+    # print(affined_pixel_base_keypoints.shape)
+    # feats0 = {'keypoints': affined_pixel_base_keypoints[None].to(device), 'descriptors': affined_base_descriptions[None].to(device), 'image_size': base_img_size[None].to(device)}
+    # feats1 = {'keypoints': pixel_detected_deformed_keypoints[None].to(device), 'descriptors': detected_deformed_descriptions[None].to(device), 'image_size': deformed_img_size[None].to(device)}
 
-    affine_matches = lightglue_matcher({'image0': feats0, 'image1': feats1})
+    # affine_matches = lightglue_matcher({'image0': feats0, 'image1': feats1})
 
-    matches = affine_matches['matches'][0]
-    base_matches = feats0['keypoints'][0][matches[:,0]]
-    deformed_matches = feats1['keypoints'][0][matches[:,1]]
+    # matches = affine_matches['matches'][0]
+    # base_matches = feats0['keypoints'][0][matches[:,0]]
+    # deformed_matches = feats1['keypoints'][0][matches[:,1]]
+
+    best_matches = []
+    best_base_matches = []
+    best_deformed_matches = []
+    best_scores = torch.tensor([], device=device)
+
+    for i in range(stretched_descriptions.shape[0]):  # Iterate over batch
+
+        feats0 = {
+            'keypoints': pixel_base_keypoints[None].to(device),
+            'descriptors': stretched_descriptions[i][None].to(device),
+            'image_size': base_img_size[None].to(device)
+        }
+        feats1 = {
+            'keypoints': pixel_detected_deformed_keypoints[None].to(device),
+            'descriptors': detected_deformed_descriptions[None].to(device),
+            'image_size': deformed_img_size[None].to(device)
+        }
+
+        affine_matches = lightglue_matcher({'image0': feats0, 'image1': feats1})
+
+        matches = affine_matches['matches'][0]
+        scores = affine_matches['scores'][0]  # Assuming LightGlue provides scores
+
+        if len(best_scores) < 500:
+            best_base_matches.append(feats0['keypoints'][0][matches[:, 0]])
+            best_deformed_matches.append(feats1['keypoints'][0][matches[:, 1]])
+            best_scores = torch.cat([best_scores, scores])
+        else:
+            # Combine current batch with existing best matches
+            combined_scores = torch.cat([best_scores, scores])
+            combined_base_matches = torch.cat(best_base_matches + [feats0['keypoints'][0][matches[:, 0]]])
+            combined_deformed_matches = torch.cat(best_deformed_matches + [feats1['keypoints'][0][matches[:, 1]]])
+
+            # Sort and keep top 500
+            top_indices = combined_scores.argsort(descending=True)[:500]
+            best_scores = combined_scores[top_indices]
+            best_base_matches = [combined_base_matches[top_indices]]
+            best_deformed_matches = [combined_deformed_matches[top_indices]]
+
+    stretched_matches = torch.cat(best_base_matches, dim=0)
+    deformed_matches = torch.cat(best_deformed_matches, dim=0)
 
 gt_pixel_coords = np.array([track_pixel_displacement(u, pixel, W, H, dW, dH, 10, 10, new_lx, new_ly) for pixel in stretched_matches.cpu()])
 distances = (deformed_matches.cpu() - gt_pixel_coords).norm(dim=1)
