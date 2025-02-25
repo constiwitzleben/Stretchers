@@ -55,8 +55,9 @@ def sp_detect_and_describe(im, device, num_keypoints = 100):
     descriptions = feats["descriptors"][0].cpu()
     scores = feats["keypoint_scores"][0].cpu()
     dense_descriptions = feats["dense_descriptors"].cpu()
+    img_size = feats["image_size"][0].cpu()
 
-    return keypoints, scores, descriptions, dense_descriptions, scales
+    return keypoints, scores, descriptions, dense_descriptions, scales, img_size
 
 
 
@@ -126,7 +127,7 @@ def sp_get_affine_deformed_descriptions(image, pixel_keypoints, tensors, device)
 
         # Get deformed descriptor without saving and reading the image
         deformed_image = np.array(deformed_image, dtype=np.uint8)
-        _, _, _, deformed_dense_descriptions, scales = sp_detect_and_describe(deformed_image, device, 10000)
+        _, _, _, deformed_dense_descriptions, scales, _ = sp_detect_and_describe(deformed_image, device, 10000)
         sp_keypoints = (torch.tensor(deformed_pixel_keypoints) + 0.5) * scales - 0.5
         deformed_descriptions = custom_sample_descriptors(sp_keypoints.to(float), deformed_dense_descriptions.cpu().to(float)).permute(0,2,1)[0]
         affine_deformed_descriptions.append(deformed_descriptions.cpu())
