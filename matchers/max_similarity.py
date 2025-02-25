@@ -4,9 +4,9 @@ import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
 from DeDoDe.utils import to_pixel_coords, to_normalized_coords
-from util.Affine_Transformations import generate_strain_tensors, generate_27_strain_tensors
+from util.Affine_Transformations import generate_strain_tensors, generate_27_strain_tensors, generate_larger_strain_tensors
 
-def dual_softmax_matcher(stretched_descriptors: tuple['T','N','D'], base_descriptor: tuple['1','M','D'], inv_temperature = 1, normalize = False, only27 = False):
+def dual_softmax_matcher(stretched_descriptors: tuple['T','N','D'], base_descriptor: tuple['1','M','D'], inv_temperature = 1, normalize = False, stretch_type = 'normal'):
 
     T, N, D = stretched_descriptors.shape
     base_descriptor = base_descriptor.repeat(T, 1, 1)
@@ -39,8 +39,10 @@ def dual_softmax_matcher(stretched_descriptors: tuple['T','N','D'], base_descrip
     top5_counts, top5_indices = torch.topk(stretch_counts, 5)
     top5_percents = (top5_counts / stretch_counts.sum()) * 100
 
-    if only27:
+    if stretch_type == 'only27':
         tensors = np.array(generate_27_strain_tensors())
+    elif stretch_type == 'larger':
+        tensors = np.array(generate_larger_strain_tensors())
     else:
         tensors = np.array(generate_strain_tensors())
 
@@ -54,7 +56,7 @@ class StretcherDualSoftMaxMatcher(nn.Module):
     @torch.inference_mode()
     def match(self, keypoints_A, descriptions_A, 
               keypoints_B, descriptions_B, P_A = None, P_B = None, 
-              normalize = False, inv_temp = 1, threshold = 0.0, only27 = False):
+              normalize = False, inv_temp = 1, threshold = 0.0, stretch_type = 'normal'):
         if isinstance(descriptions_A, list):
             matches = [self.match(k_A[None], d_A[None], k_B[None], d_B[None], normalize = normalize,
                                inv_temp = inv_temp, threshold = threshold) 
@@ -66,7 +68,7 @@ class StretcherDualSoftMaxMatcher(nn.Module):
             return matches_A, matches_B, inds
         
         P, corr_indices = dual_softmax_matcher(descriptions_A, descriptions_B, 
-                                 normalize = normalize, inv_temperature=inv_temp, only27 = only27,
+                                 normalize = normalize, inv_temperature=inv_temp, stretch_type = stretch_type,
                                  )
         inds = torch.nonzero((P == P.max(dim=-1, keepdim = True).values) 
                         * (P == P.max(dim=-2, keepdim = True).values) * (P > threshold))
@@ -83,8 +85,10 @@ class StretcherDualSoftMaxMatcher(nn.Module):
         top5_counts, top5_indices = torch.topk(stretch_counts, index)
         top5_percents = (top5_counts / stretch_counts.sum()) * 100
 
-        if only27:
+        if stretch_type == 'only27':
             tensors = np.array(generate_27_strain_tensors())
+        elif stretch_type == 'larger':
+            tensors = np.array(generate_larger_strain_tensors())
         else:
             tensors = np.array(generate_strain_tensors())
 

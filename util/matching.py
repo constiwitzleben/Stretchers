@@ -15,7 +15,7 @@ def draw_matches(im_A, kpts_A, im_B, kpts_B):
                     matches_A_to_B, None)
     return ret
 
-def draw_matches_with_scores(im_A, kpts_A, im_B, kpts_B, distances, threshold=5):
+def draw_matches_with_scores(im_A, kpts_A, im_B, kpts_B, distances, threshold=5, lines=True):
     im_A = np.array(im_A, dtype=np.uint8)
     im_B = np.array(im_B, dtype=np.uint8)
     
@@ -39,11 +39,12 @@ def draw_matches_with_scores(im_A, kpts_A, im_B, kpts_B, distances, threshold=5)
         color = (0, 255, 0) if dist < threshold else (0, 0, 255)  # Green if below, Red if above
         
         # Draw the match line
-        cv2.line(out_image, (xA, yA), (xB, yB), color, 2)
+        if lines is True:
+            cv2.line(out_image, (xA, yA), (xB, yB), color, 2)
         
         # Draw keypoints
-        cv2.circle(out_image, (xA, yA), 4, (255, 0, 0), -1)  # Blue keypoints on A
-        cv2.circle(out_image, (xB, yB), 4, (255, 0, 0), -1)  # Blue keypoints on B
+        cv2.circle(out_image, (xA, yA), 4, color, -1)  # Blue keypoints on A
+        cv2.circle(out_image, (xB, yB), 4, color, -1)  # Blue keypoints on B
 
     return out_image
 

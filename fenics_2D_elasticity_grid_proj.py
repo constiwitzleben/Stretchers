@@ -23,7 +23,7 @@ def epsilon(u):
 def sigma(u, lambda_, mu):
     return lambda_*fe.div(u)*fe.Identity(2) + 2*mu*epsilon(u)
 
-def create_deformed_medical_image_pair(image_dir, deformed_image_dir):
+def create_deformed_medical_image_pair(image_dir, deformed_image_dir, g_zy=12e6, g_zx=1e6):
 
     # --------------------
     # Parameters
@@ -44,8 +44,8 @@ def create_deformed_medical_image_pair(image_dir, deformed_image_dir):
     n_x, n_y = 50, 50  # Number of elements
 
     # Load
-    g_zy = 12e6
-    g_zx = 1e6
+    g_zy = g_zy
+    g_zx = g_zx
     b_z = 000.0
     g = fe.Constant((g_zx, g_zy))
     b = fe.Constant((0.0, b_z))
@@ -101,16 +101,18 @@ def create_deformed_medical_image_pair(image_dir, deformed_image_dir):
     # --------------------
     # Post-process
     # --------------------
-    fe.plot(u, mode="displacement")
-    fe.plot(mesh)
+    # fe.plot(u, mode="displacement")
+    # fe.plot(mesh)
     # plt.show()
 
     displacements_at_vertices = np.array([u(x) for x in mesh.coordinates()])
 
-    #updated_coords = mesh.coordinates() + displacements_at_vertices
-    #mesh.coordinates()[:] = updated_coords
-    #fe.plot(mesh, title="Deformed Mesh")
-    #plt.show()
+    # updated_coords = mesh.coordinates() + displacements_at_vertices
+    # mesh.coordinates()[:] = updated_coords
+    # fe.plot(mesh, title="Deformed Mesh")
+    # #Save plot
+    # plt.savefig("Visualisations/deformed_mesh.png", dpi=300, bbox_inches='tight')
+    
 
 
     # --------------------
@@ -147,6 +149,8 @@ def create_deformed_medical_image_pair(image_dir, deformed_image_dir):
     # Apply the texture and visualize
     # plotter = pv.Plotter(window_size=[400, 800])
     plotter = pv.Plotter(off_screen=True)
+    plotter.enable_anti_aliasing()
+    plotter.enable_image_style()
 
 
     # Calculate mesh bounds (for your PyVista plane, which represents the mesh)
@@ -173,14 +177,16 @@ def create_deformed_medical_image_pair(image_dir, deformed_image_dir):
     aspect_ratio = (bounds[1] - bounds[0]) / (bounds[3] - bounds[2])
     window_height = int(img_height * ((bounds[3] - bounds[2])/l_y))  # for example, choose a height in pixels
     window_width = int(window_height * aspect_ratio)
+    # window_width = int(img_width * ((bounds[1] - bounds[0])/l_x))
     plotter.window_size = (window_width, window_height)
 
     # Render and capture the screenshot
     #plotter.add_mesh(plane, style='wireframe')
-    plotter.add_mesh(plane, texture=texture)
+    plotter.add_mesh(plane, texture=texture, interpolate_before_map=True)
     #plotter.show_axes()
     #plotter.show()
-    plotter.show(screenshot=deformed_image_dir)
+    # plotter.show(screenshot=deformed_image_dir)
+    cv2.imwrite(deformed_image_dir, cv2.cvtColor(plotter.screenshot(), cv2.COLOR_RGB2BGR))
 
     return u, new_lx, new_ly
 
