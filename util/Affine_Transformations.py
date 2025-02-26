@@ -4,6 +4,7 @@ from skimage.transform import warp, AffineTransform
 from numpy import pad
 from skimage import io
 import torch
+import cv2
 
 # Generate a simple chessboard image
 def create_chessboard(size=100, block_size=10):
@@ -57,7 +58,10 @@ def generate_27_strain_tensors():
         for xy in shear_xy
     ]
     return tensors
-   
+
+
+def generate_test_strain_tensors():
+    return [[0.5,0.5,0.0],[0.0,0.0,0.0],[-0.25,-0.25,0.0]]
 
 # Perform polar decomposition
 def polar_decomposition(F):
@@ -313,31 +317,35 @@ def apply_corotated_strain_with_keypoints(image, keypoints, s, dataset_mode=True
     if dataset_mode == False:
         corners = np.array([
         [0, 0],  # Top-left
-        [0, W],  # Top-right
-        [H, W],  # Bottom-right
-        [H, 0]   # Bottom-left
+        [W, 0],  # Top-right
+        [W, H],  # Bottom-right
+        [0, H]   # Bottom-left
         ])
         new_corners = transform(corners)
         min_x, min_y = np.floor(new_corners.min(axis=0)).astype(int)
         max_x, max_y = np.ceil(new_corners.max(axis=0)).astype(int)
 
         # Compute new width and height
-        output_shape = (max_x - min_x, max_y - min_y)
+        output_shape = (max_y - min_y, max_x - min_x)
 
         offset_transform = AffineTransform(translation=(-min_x, -min_y))
         transform = transform + offset_transform  # Combine transformations
 
 
-    # Apply warp
-    transformed_image = warp(
-        image,
-        inverse_map=transform.inverse,
-        mode="constant",
-        cval=0.0,
-        preserve_range=True,
-        order=3, # Bicubic interpolation
-        output_shape=output_shape
-    )
+    # Apply warp with skimage warp
+    # transformed_image = warp(
+    #     image,
+    #     inverse_map=transform.inverse,
+    #     mode="constant",
+    #     cval=0.0,
+    #     preserve_range=True,
+    #     order=1, # Bicubic interpolation
+    #     output_shape=output_shape
+    # )
+
+    # Apply warp with cv2 warpAffine
+    M = transform.params[:2, :]
+    transformed_image = cv2.warpAffine(image, M, (output_shape[1],output_shape[0]), flags=cv2.INTER_LINEAR, borderMode=cv2.BORDER_CONSTANT, borderValue=0)
 
     transformed_image = np.array(transformed_image, dtype=np.uint8)
 

@@ -29,7 +29,7 @@ W,H = image.size
 print(W,H)
 np_image = np.array(image)
 
-inner_cutoff = 4
+inner_cutoff = 1
 double_cutoff = inner_cutoff*2
 uH = (inner_cutoff - 1) * H // double_cutoff
 lH = (inner_cutoff + 1) * H // double_cutoff

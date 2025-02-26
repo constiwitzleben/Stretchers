@@ -30,6 +30,7 @@ def visualize_keypoint_similarities(image, keypoints, similarities, min = None, 
     # Normalize similarities to range [0,1] for color mapping
     similarities = (similarities - min) / (max - min)
     similarities = similarities.cpu().numpy()  # Convert to NumPy array if it's a tensor
+    similarities = np.clip(similarities, 0, 1)  # Ensure values are within [0,1]
 
     # Convert similarities to a colormap (from red (low) to green (high))
     colors = (255 * np.stack((np.zeros_like(similarities) , similarities, 1 - similarities), axis=1)).astype(np.uint8)

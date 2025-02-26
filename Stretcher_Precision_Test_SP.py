@@ -5,7 +5,7 @@ from DeDoDe.utils import *
 from PIL import Image
 import numpy as np
 import os
-from util.Affine_Transformations import apply_corotated_strain_with_keypoints, generate_strain_tensors, generate_27_strain_tensors, generate_larger_strain_tensors
+from util.Affine_Transformations import apply_corotated_strain_with_keypoints, generate_strain_tensors, generate_27_strain_tensors, generate_larger_strain_tensors, generate_test_strain_tensors
 from models import Embedded_Conditional_Residual_MLP, Embedded_Conditional_Fully_Residual_MLP
 import time
 from matchers.max_similarity import StretcherDualSoftMaxMatcher
@@ -31,12 +31,15 @@ stretch_type = 'normal'
 good_match_threshold = 5
 chosen_keypoints = None
 model = 'superpoint'
-matching = 'lightglue'
+base_matching = 'lightglue'
+affine_matching = 'dualsoftmax'
 
 if stretch_type == 'only27':
     tensors = np.array(generate_27_strain_tensors())
 elif stretch_type == 'larger':
     tensors = np.array(generate_larger_strain_tensors())
+elif stretch_type == 'test':
+    tensors = np.array(generate_test_strain_tensors())
 else:
     tensors = np.array(generate_strain_tensors())
 
@@ -147,12 +150,12 @@ if model == 'dedode':
 if model == 'superpoint':
     pixel_detected_deformed_keypoints, deformed_P, detected_deformed_descriptions, detected_deformed_dense_descriptions, scales, deformed_img_size = sp_detect_and_describe(deformed_image, device, num_keypoints)
 
-if matching == 'dualsoftmax':
+if base_matching == 'dualsoftmax':
     base_matches, deformed_matches, batch_ids = matcher.match(pixel_base_keypoints[None].to(device), base_descriptions.to(device),
             pixel_detected_deformed_keypoints[None].to(device), detected_deformed_descriptions.to(device),
             P_A = base_P, P_B = deformed_P,
             normalize = True, inv_temp=20, threshold = 0.01)
-elif matching == 'lightglue':
+elif base_matching == 'lightglue':
     feats0 = {'keypoints': pixel_base_keypoints[None].to(device), 'descriptors': base_descriptions[None].to(device), 'image_size': base_img_size[None].to(device)}
     feats1 = {'keypoints': pixel_detected_deformed_keypoints[None].to(device), 'descriptors': detected_deformed_descriptions[None].to(device), 'image_size': deformed_img_size[None].to(device)}
 
@@ -179,12 +182,12 @@ elif model == 'superpoint':
 #   Matching Affine Transformed to Deformed
 #----------------------------------------------------------------------------------
 
-if matching == 'dualsoftmax':
+if affine_matching == 'dualsoftmax':
     stretched_matches, deformed_matches, batch_ids = stretcher_matcher.match(pixel_base_keypoints[None].to(device), stretched_descriptions.to(device),
             pixel_detected_deformed_keypoints[None].to(device), detected_deformed_descriptions.to(device),
             P_A = base_P, P_B = deformed_P,
             normalize = True, inv_temp=20, threshold = 0.05, stretch_type=stretch_type)
-elif matching == 'lightglue':
+elif affine_matching == 'lightglue':
     # shape = stretched_descriptions.shape
     # affined_base_descriptions = stretched_descriptions.reshape(shape[0]*shape[1], shape[2])
     # print(affined_base_descriptions.shape)
@@ -199,10 +202,17 @@ elif matching == 'lightglue':
     # base_matches = feats0['keypoints'][0][matches[:,0]]
     # deformed_matches = feats1['keypoints'][0][matches[:,1]]
 
-    best_matches = []
-    best_base_matches = []
-    best_deformed_matches = []
-    best_scores = torch.tensor([], device=device)
+    # New Version
+    best_matches = {}
+    base_keypoint_carrier = {}
+    best_scores = {}
+    best_descriptor_versions = {}
+
+    # Old Version
+    # best_matches = []
+    # best_base_matches = []
+    # best_deformed_matches = []
+    # best_scores = torch.tensor([], device=device)
 
     for i in range(stretched_descriptions.shape[0]):  # Iterate over batch
 
@@ -222,24 +232,70 @@ elif matching == 'lightglue':
         matches = affine_matches['matches'][0]
         scores = affine_matches['scores'][0]  # Assuming LightGlue provides scores
 
-        if len(best_scores) < 500:
-            best_base_matches.append(feats0['keypoints'][0][matches[:, 0]])
-            best_deformed_matches.append(feats1['keypoints'][0][matches[:, 1]])
-            best_scores = torch.cat([best_scores, scores])
-        else:
-            # Combine current batch with existing best matches
-            combined_scores = torch.cat([best_scores, scores])
-            combined_base_matches = torch.cat(best_base_matches + [feats0['keypoints'][0][matches[:, 0]]])
-            combined_deformed_matches = torch.cat(best_deformed_matches + [feats1['keypoints'][0][matches[:, 1]]])
+        # New Version
+        base_indices = matches[:, 0]  # Indices of matched keypoints in the base image
+        base_keypoints = feats0['keypoints'][0][matches[:,0]]  # Corresponding matched keypoints
+        deformed_keypoints = feats1['keypoints'][0][matches[:, 1]]  # Corresponding matched keypoints
 
-            # Sort and keep top 500
-            top_indices = combined_scores.argsort(descending=True)[:500]
-            best_scores = combined_scores[top_indices]
-            best_base_matches = [combined_base_matches[top_indices]]
-            best_deformed_matches = [combined_deformed_matches[top_indices]]
+        for j in range(len(base_indices)):
+            keypoint_idx = base_indices[j].item()  # Convert to int for dictionary key
+            score = scores[j].item()
 
-    stretched_matches = torch.cat(best_base_matches, dim=0)
-    deformed_matches = torch.cat(best_deformed_matches, dim=0)
+            # If keypoint is not stored yet OR this match has a higher score, update it
+            if keypoint_idx not in best_matches or score > best_scores[keypoint_idx]:
+                best_matches[keypoint_idx] = deformed_keypoints[j]  # Save best-matching keypoint
+                base_keypoint_carrier[keypoint_idx] = base_keypoints[j]  # Save corresponding base keypoint
+                best_scores[keypoint_idx] = score  # Save best score
+                best_descriptor_versions[keypoint_idx] = i  # Track descriptor version
+
+    # Convert to tensors
+    unique_base_matches = torch.stack(list(base_keypoint_carrier.values()))  # Base keypoints
+    # unique_base_matches = torch.tensor(list(best_matches.keys()), device=device)  # Indices of best keypoints
+    unique_deformed_matches = torch.stack(list(best_matches.values()))  # Matched keypoints
+    unique_scores = torch.tensor(list(best_scores.values()), device=device)  # Best scores
+    descriptor_versions = torch.tensor(list(best_descriptor_versions.values()), device=device)  # Descriptor versions
+
+    # Select top 500 unique matches based on score
+    top_indices = unique_scores.argsort(descending=True)[:500]
+
+    stretched_matches = unique_base_matches[top_indices]  # Best 500 keypoints (indices)
+    print(stretched_matches)
+    print(stretched_matches.shape)
+    deformed_matches = unique_deformed_matches[top_indices]  # Best 500 matched keypoints
+    print(deformed_matches)
+    print(deformed_matches.shape)
+    matched_transformations = descriptor_versions[top_indices]  # Descriptor versions for these matches
+    print(matched_transformations)
+    print(matched_transformations.shape)
+
+    stretch_counts = torch.bincount(matched_transformations.to(torch.int64))
+    index = 5 if len(stretch_counts) > 5 else len(stretch_counts)
+    top5_counts, top5_indices = torch.topk(stretch_counts, index)
+    top5_percents = (top5_counts / stretch_counts.sum()) * 100
+    print(f'Top 5 stretches for matching:')
+    for i in range(index):
+        print(f'{tensors[top5_indices[i]]}: {top5_percents[i]:.0f}%')
+
+
+        # Old version
+        # if len(best_scores) < 500:
+        #     best_base_matches.append(feats0['keypoints'][0][matches[:, 0]])
+        #     best_deformed_matches.append(feats1['keypoints'][0][matches[:, 1]])
+        #     best_scores = torch.cat([best_scores, scores])
+        # else:
+        #     # Combine current batch with existing best matches
+        #     combined_scores = torch.cat([best_scores, scores])
+        #     combined_base_matches = torch.cat(best_base_matches + [feats0['keypoints'][0][matches[:, 0]]])
+        #     combined_deformed_matches = torch.cat(best_deformed_matches + [feats1['keypoints'][0][matches[:, 1]]])
+
+        #     # Sort and keep top 500
+        #     top_indices = combined_scores.argsort(descending=True)[:500]
+        #     best_scores = combined_scores[top_indices]
+        #     best_base_matches = [combined_base_matches[top_indices]]
+        #     best_deformed_matches = [combined_deformed_matches[top_indices]]
+
+    # stretched_matches = torch.cat(best_base_matches, dim=0)
+    # deformed_matches = torch.cat(best_deformed_matches, dim=0)
 
 gt_pixel_coords = np.array([track_pixel_displacement(u, pixel, W, H, dW, dH, 10, 10, new_lx, new_ly) for pixel in stretched_matches.cpu()])
 distances = (deformed_matches.cpu() - gt_pixel_coords).norm(dim=1)
