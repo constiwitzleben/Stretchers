@@ -25,22 +25,25 @@ np.random.seed(0)
 
 # Define parameters
 image_dir = "data/medical_training_data"
-deformations_per_image = 14
-kp_per_deformation = 14
+deformations_per_image = 125
+kp_per_deformation = 1
 kp_per_image = deformations_per_image * kp_per_deformation
-num_images = 694
 
 # Create detector and descriptor instances
 device = get_best_device()
 
 # Load image_paths
 image_names = os.listdir(image_dir)
+num_images = len(image_names)
+print(f"Number of images: {num_images}")
 
 # Initialize arrays to store descriptors
 non_deformed_descriptors = np.zeros((len(image_names)*deformations_per_image*kp_per_deformation, 256))
 deformed_descriptors = np.zeros((len(image_names)*deformations_per_image*kp_per_deformation, 256))
 deformation_grid = generate_strain_tensors()
-deformation_idx = np.random.randint(0,len(deformation_grid),size=(num_images,deformations_per_image))
+# deformation_idx = np.random.randint(0,len(deformation_grid),size=(num_images,deformations_per_image))
+deformation_idx = np.tile(np.arange(len(deformation_grid)), (num_images, 1))
+print(deformation_idx)
 
 # Loop over image_paths
 for i, image_name in enumerate(image_names):
@@ -96,4 +99,4 @@ for i, image_name in enumerate(image_names):
 torch_descriptors = torch.tensor(non_deformed_descriptors)
 torch_deformed_descriptors = torch.tensor(deformed_descriptors)
 torch_deformations = torch.tensor(deformation_idx)
-torch.save({'descriptors': torch_descriptors, 'deformed_descriptors': torch_deformed_descriptors, 'transformations': torch_deformations}, "data/SuperPoint_Descriptors_Dataset.pth")
+torch.save({'descriptors': torch_descriptors, 'deformed_descriptors': torch_deformed_descriptors, 'transformations': torch_deformations}, "data/SuperPoint_Descriptors_Dataset_Test.pth")

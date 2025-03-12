@@ -23,6 +23,24 @@ def epsilon(u):
 def sigma(u, lambda_, mu):
     return lambda_*fe.div(u)*fe.Identity(2) + 2*mu*epsilon(u)
 
+def von_mises_stress(sigma):
+    sigma_11 = sigma[0, 0]
+    sigma_22 = sigma[1, 1]
+    sigma_12 = sigma[0, 1]  # Shear component
+
+    return fe.sqrt(sigma_11**2 + sigma_22**2 - sigma_11 * sigma_22 + 3 * sigma_12**2)
+
+def von_mises_strain(E,u):
+    """Compute von Mises strain from Green-Lagrange strain tensor."""
+    dim = len(u)  # Dimension (2D or 3D)
+    if dim == 2:
+        return fe.sqrt(0.5 * ((E[0, 0] - E[1, 1])**2 + E[0, 0]**2 + E[1, 1]**2 + 6 * E[0, 1]**2))
+    elif dim == 3:
+        return fe.sqrt(0.5 * ((E[0, 0] - E[1, 1])**2 + (E[1, 1] - E[2, 2])**2 + 
+                              (E[2, 2] - E[0, 0])**2 + 6 * (E[0, 1]**2 + E[1, 2]**2 + E[2, 0]**2)))
+
+
+
 def create_deformed_medical_image_pair(image_dir, deformed_image_dir, g_zy=12e6, g_zx=1e6):
 
     # --------------------
@@ -101,8 +119,36 @@ def create_deformed_medical_image_pair(image_dir, deformed_image_dir, g_zy=12e6,
     # --------------------
     # Post-process
     # --------------------
+    # plt.clf()
     # fe.plot(u, mode="displacement")
     # fe.plot(mesh)
+    # plt.show()
+
+    F = fe.Identity(len(u)) + fe.grad(u)
+    E = 0.5 * (F.T * F - fe.Identity(len(u)))
+    V_scalar = fe.FunctionSpace(mesh, "P", 1)  # Scalar function space
+    strain_vm = fe.project(von_mises_strain(E,u), V_scalar)
+
+    # print("Min strain:", np.min(strain_vm.vector()[:]))
+    # print("Max strain:", np.max(strain_vm.vector()[:]))
+
+    # plt.figure()
+    # p = fe.plot(strain_vm, cmap="viridis", vmin=0,vmax=3)  # Choose a color map
+    # plt.colorbar(p)
+    # plt.title("Von Mises Strain Field")
+    # plt.show()
+
+
+    # s = sigma(u, lambda_, mu)
+
+    # V_vm = fe.FunctionSpace(mesh, "P", 1)  # Scalar function space
+    # sigma_vm = fe.project(von_mises_stress(s), V_vm)
+
+    # # Plot results
+    # plt.clf()
+    # fig, ax = plt.subplots()
+    # p = fe.plot(sigma_vm, cmap="viridis")  # Choose a colormap, e.g., "viridis" or "jet"
+    # fig.colorbar(p, ax=ax, label="Von Mises Stress")
     # plt.show()
 
     displacements_at_vertices = np.array([u(x) for x in mesh.coordinates()])
@@ -188,7 +234,7 @@ def create_deformed_medical_image_pair(image_dir, deformed_image_dir, g_zy=12e6,
     # plotter.show(screenshot=deformed_image_dir)
     cv2.imwrite(deformed_image_dir, cv2.cvtColor(plotter.screenshot(), cv2.COLOR_RGB2BGR))
 
-    return u, new_lx, new_ly
+    return u, strain_vm, new_lx, new_ly
 
 # u, new_lx, new_ly = create_deformed_medical_image_pair("data/medical_deformed/brain.png")
 
@@ -223,6 +269,30 @@ def track_pixel_displacement(u, pixel_coords, img_width, img_height, new_img_wid
     j_new = (1-(y_new / new_l_y)) * new_img_height
     
     return (i_new, j_new)
+
+def get_strain(s,pixel, img_width, img_height, l_x, l_y):
+    """
+    Given the strain field `s`, compute the strain at a pixel at `pixel`.
+    
+    Args:
+        s: FEniCS strain function.
+        pixel: Tuple (i, j) representing pixel coordinates in the original image.
+        img_width: Width of the image.
+        img_height: Height of the image.
+        l_x: Width of the mesh domain.
+        l_y: Height of the mesh domain.
+    
+    Returns:
+        Strain value at the pixel.
+    """
+    # Convert pixel coordinates to physical space
+    x = (pixel[0] / img_width) * l_x
+    y = (1-(pixel[1] / img_height)) * l_y
+    
+    # Evaluate strain field at (x, y)
+    strain = s((x, y))
+    
+    return strain
 
 # brain = cv2.imread('data/medical_deformed/brain.png')[:, :, ::-1]
 # deformed_brain = cv2.imread('data/medical_deformed/deformed_brain.png')[:,:,::-1]

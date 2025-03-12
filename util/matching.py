@@ -7,12 +7,18 @@ from util.Affine_Transformations import transform_keypoints
 def draw_matches(im_A, kpts_A, im_B, kpts_B):
     im_A = np.array(im_A, dtype=np.uint8)
     im_B = np.array(im_B, dtype=np.uint8)
-    kpts_A = [cv2.KeyPoint(x,y,1.) for x,y in kpts_A.cpu().numpy()]
-    kpts_B = [cv2.KeyPoint(x,y,1.) for x,y in kpts_B.cpu().numpy()]
+    kpts_A = [cv2.KeyPoint(x, y, 1.) for x, y in kpts_A.cpu().numpy()]
+    kpts_B = [cv2.KeyPoint(x, y, 1.) for x, y in kpts_B.cpu().numpy()]
     matches_A_to_B = [cv2.DMatch(idx, idx, 0.) for idx in range(len(kpts_A))]
-    im_A, im_B = np.array(im_A), np.array(im_B)
-    ret = cv2.drawMatches(im_A, kpts_A, im_B, kpts_B, 
-                    matches_A_to_B, None)
+
+    # Draw matches with green lines and increased thickness
+    ret = cv2.drawMatches(
+        im_A, kpts_A, im_B, kpts_B, matches_A_to_B, None, 
+        matchColor=(0, 255, 0),  # Green color (BGR format)
+        singlePointColor=None,   # Default keypoint color
+        flags=cv2.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS
+    )
+    
     return ret
 
 def draw_matches_with_scores(im_A, kpts_A, im_B, kpts_B, distances, threshold=5, lines=True):
@@ -26,7 +32,7 @@ def draw_matches_with_scores(im_A, kpts_A, im_B, kpts_B, distances, threshold=5,
     # Stack images horizontally for visualization
     hA, wA = im_A.shape[:2]
     hB, wB = im_B.shape[:2]
-    out_image = np.zeros((max(hA, hB), wA + wB, 3), dtype=np.uint8)
+    out_image = np.ones((max(hA, hB), wA + wB, 3), dtype=np.uint8)*255
     out_image[:hA, :wA] = im_A
     out_image[:hB, wA:] = im_B
     
@@ -40,7 +46,8 @@ def draw_matches_with_scores(im_A, kpts_A, im_B, kpts_B, distances, threshold=5,
         
         # Draw the match line
         if lines is True:
-            cv2.line(out_image, (xA, yA), (xB, yB), color, 2)
+            if dist < threshold:
+                cv2.line(out_image, (xA, yA), (xB, yB), color, 2)
         
         # Draw keypoints
         cv2.circle(out_image, (xA, yA), 4, color, -1)  # Blue keypoints on A

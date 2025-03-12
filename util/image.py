@@ -1,6 +1,6 @@
 import numpy as np
 import cv2
-import PIL as image
+from PIL import Image
 
 def draw_keypoints(image, keypoints):
     image = image[..., ::-1]
@@ -60,3 +60,35 @@ def visualize_keypoint_similarities(image, keypoints, similarities, min = None, 
     final_vis = np.vstack((vis_image, color_bar))
     
     return final_vis, min, max
+
+def crop_to_square(img):
+
+    # Get the dimensions of the image
+    width, height = img.size
+
+    # Check if the image is square
+    if width == height:
+        return img  # Image is already square
+
+    # Calculate the size of the new square image (min of width and height)
+    new_size = min(width, height)
+
+    # Calculate the cropping box (center the image)
+    left = (width - new_size) / 2
+    top = (height - new_size) / 2
+    right = (width + new_size) / 2
+    bottom = (height + new_size) / 2
+
+    # Crop the image and return the result
+    cropped_img = img.crop((left, top, right, bottom))
+    return cropped_img
+
+if __name__ == "__main__":
+    im_path = 'data/medical_deformed/pig_liver_rest_480.png'
+    im_path_to_deform = 'data/medical_deformed/pig_liver_to_elongate_480.png'
+    image = Image.open(im_path)
+    im_to_deform = Image.open(im_path_to_deform)
+    image = crop_to_square(image)
+    im_to_deform = crop_to_square(im_to_deform)
+    image.save('data/medical_deformed/pig_liver_rest_480_square.png')
+    im_to_deform.save('data/medical_deformed/pig_liver_to_elongate_480_square.png')
