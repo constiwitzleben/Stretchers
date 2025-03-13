@@ -39,8 +39,6 @@ def von_mises_strain(E,u):
         return fe.sqrt(0.5 * ((E[0, 0] - E[1, 1])**2 + (E[1, 1] - E[2, 2])**2 + 
                               (E[2, 2] - E[0, 0])**2 + 6 * (E[0, 1]**2 + E[1, 2]**2 + E[2, 0]**2)))
 
-
-
 def create_deformed_medical_image_pair(image_dir, deformed_image_dir, g_zy=12e6, g_zx=1e6):
 
     # --------------------
@@ -204,6 +202,8 @@ def create_deformed_medical_image_pair(image_dir, deformed_image_dir, g_zy=12e6,
     x_center = (bounds[0] + bounds[1]) / 2.0
     y_center = (bounds[2] + bounds[3]) / 2.0
 
+    bottom_left = (bounds[0], bounds[2])
+
     # print(bounds)
     new_lx = bounds[1] - bounds[0]
     new_ly = bounds[3] - bounds[2]
@@ -234,11 +234,11 @@ def create_deformed_medical_image_pair(image_dir, deformed_image_dir, g_zy=12e6,
     # plotter.show(screenshot=deformed_image_dir)
     cv2.imwrite(deformed_image_dir, cv2.cvtColor(plotter.screenshot(), cv2.COLOR_RGB2BGR))
 
-    return u, strain_vm, new_lx, new_ly
+    return u, strain_vm, new_lx, new_ly, bottom_left
 
 # u, new_lx, new_ly = create_deformed_medical_image_pair("data/medical_deformed/brain.png")
 
-def track_pixel_displacement(u, pixel_coords, img_width, img_height, new_img_width, new_img_height, l_x, l_y, new_l_x, new_l_y):
+def track_pixel_displacement(u, pixel_coords, img_width, img_height, new_img_width, new_img_height, l_x, l_y, new_l_x, new_l_y, bottom_left):
     """
     Given the displacement field `u`, track where a pixel at `pixel_coords` moves after deformation.
     
@@ -264,6 +264,9 @@ def track_pixel_displacement(u, pixel_coords, img_width, img_height, new_img_wid
     x_new = x + u_disp[0]
     y_new = y + u_disp[1]
     
+    x_new -= bottom_left[0]
+    y_new -= bottom_left[1]
+
     # Convert back to pixel space
     i_new = (x_new / new_l_x) * new_img_width
     j_new = (1-(y_new / new_l_y)) * new_img_height

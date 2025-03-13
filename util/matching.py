@@ -3,6 +3,7 @@ import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 import torch
 from util.Affine_Transformations import transform_keypoints
+from fenics_2D_elasticity_grid_proj import get_strain
 
 def draw_matches(im_A, kpts_A, im_B, kpts_B):
     im_A = np.array(im_A, dtype=np.uint8)
@@ -88,3 +89,14 @@ def print_matching_accuracy(base_matches, deformed_matches, np_image, deformatio
     total = len(distances)
     accuracy = good / total
     print(f'Accuracy: {accuracy} ({good} / {total})')
+
+def strain_entropy(s, keypoints,W,H):
+    strain_values = np.array([get_strain(s, pixel, W, H, 10, 10) for pixel in keypoints])
+    min = np.amin(s.vector()[:])
+    max = np.amax(s.vector()[:])
+    hist, bin_edges = np.histogram(strain_values, bins=10, range=(min, max), density=True)
+    hist += 1e-10
+    entropy = -np.sum(hist*np.log(hist))
+    entropy /= np.log(10)  # Normalize by log
+    return entropy
+        
