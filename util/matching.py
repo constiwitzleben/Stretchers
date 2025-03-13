@@ -90,7 +90,7 @@ def print_matching_accuracy(base_matches, deformed_matches, np_image, deformatio
     accuracy = good / total
     print(f'Accuracy: {accuracy} ({good} / {total})')
 
-def strain_entropy(s, keypoints,W,H):
+def strain_entropy(s,keypoints,W,H):
     strain_values = np.array([get_strain(s, pixel, W, H, 10, 10) for pixel in keypoints])
     min = np.amin(s.vector()[:])
     max = np.amax(s.vector()[:])
@@ -99,4 +99,19 @@ def strain_entropy(s, keypoints,W,H):
     entropy = -np.sum(hist*np.log(hist))
     entropy /= np.log(10)  # Normalize by log
     return entropy
-        
+    
+def strain_balanced_precision(s, keypoints, good_mask, W, H):
+    strain_values = np.array([get_strain(s, pixel, W, H, 10, 10) for pixel in keypoints])
+    # Partition the keypoints into 10 partitions by strain
+    all_strain_values = s.vector()[:]
+    partitions = np.quantile(all_strain_values, np.linspace(0, 1, 11))
+    balanced_precision = 0
+    for i in range(10):
+        partition = partitions[i:i+2]
+        partition_mask = (strain_values >= partition[0]) & (strain_values < partition[1])
+        good_partition = good_mask & partition_mask
+        if good_partition.sum() > 0:
+            balanced_precision += good_partition.sum() / partition_mask.sum()
+            # print(good_partition.sum() / partition_mask.sum())
+    balanced_precision /= 10
+    return balanced_precision

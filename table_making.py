@@ -5,7 +5,7 @@ import numpy as np
 from lightglue import LightGlue, DISK, ALIKED, SuperPoint
 from lightglue.utils import load_image, rbd
 from fenics_2D_elasticity_grid_proj import create_deformed_medical_image_pair, track_pixel_displacement, get_strain
-from util.matching import draw_matches_with_scores, strain_entropy
+from util.matching import draw_matches_with_scores, strain_entropy, strain_balanced_precision
 import warnings
 warnings.filterwarnings("ignore", category=DeprecationWarning, message="__array_wrap__ must accept context and return_scalar")
 
@@ -20,9 +20,9 @@ pretty_deformed_im_path = 'data/medical_deformed/pig_liver_to_elongate_deformed.
 im_path = 'data/medical_deformed/pig_liver_to_elongate.png'
 deformed_im_path = 'data/medical_deformed/pig_liver_to_elongate_deformed.png'
 
-# deformations = np.array([[8e6, 1e6], [1e6, 8e6], [8e6, -1e6], [1e6, -8e6]])
+# deformations = np.array([[8e6, 1e6], [8e6, -1e6], [-4e6, 2e6], [-4e6, -2e6]])
 
-u, s, new_lx, new_ly, bottom_left = create_deformed_medical_image_pair(im_path, deformed_im_path, -8e6, 1e6 )
+u, s, new_lx, new_ly, bottom_left = create_deformed_medical_image_pair(im_path, deformed_im_path, 8e6, -1e6 )
 
 image = Image.open(im_path)
 deformed_image = Image.open(deformed_im_path)
@@ -63,17 +63,20 @@ deformed_matches = feats1['keypoints'][matches[..., 1]]
 
 gt_pixel_coords = np.array([track_pixel_displacement(u, pixel, W, H, dW, dH, 10, 10, new_lx, new_ly, bottom_left) for pixel in base_matches.cpu()])
 distances = (deformed_matches.cpu() - gt_pixel_coords).norm(dim=1)
-good_matches = (distances < good_match_threshold).sum().item()
+good_mask = distances < good_match_threshold
+num_good_matches = good_mask.sum().item()
 
 num_matches = len(distances)
-precision = good_matches / num_matches
-matching_score = good_matches / min(len(feats0['keypoints']), len(feats1['keypoints']))
-entropy = strain_entropy(s, base_matches.cpu(), W, H)
+precision = num_good_matches / num_matches
+matching_score = num_good_matches / min(len(feats0['keypoints']), len(feats1['keypoints']))
+entropy = strain_entropy(s, base_matches[good_mask].cpu(), W, H)
+sb_precision = strain_balanced_precision(s, base_matches.cpu(), good_mask, W, H)
 
-print(f'DISK LG Precision: {precision} ({good_matches} / {num_matches})')
+print(f'DISK LG Precision: {precision} ({num_good_matches} / {num_matches})')
 print(f'DISK LG Matching Score: {matching_score}')
 print(f'DISK LG Number of Matches: {num_matches}')
 print(f'DISK LG Entropy: {entropy}')
+print(f'DISK LG Strain Balanced Precision: {sb_precision}')
 
 baseline_matches_image = Image.fromarray(draw_matches_with_scores(pretty_image, base_matches.cpu(), pretty_deformed_image, deformed_matches.cpu(), distances, good_match_threshold, lines=True))
 baseline_matches_image.save('Visualisations/matches_disk_lg.png')
@@ -97,14 +100,14 @@ base_matches, deformed_matches, batch_ids = dsm_matcher.match(base_keypoints.to(
 
 gt_pixel_coords = np.array([track_pixel_displacement(u, pixel, W, H, dW, dH, 10, 10, new_lx, new_ly, bottom_left) for pixel in base_matches.cpu()])
 distances = (deformed_matches.cpu() - gt_pixel_coords).norm(dim=1)
-good_matches = (distances < good_match_threshold).sum().item()
+num_good_matches = (distances < good_match_threshold).sum().item()
 
 num_matches = len(distances)
-precision = good_matches / num_matches
-matching_score = good_matches / min(base_keypoints.shape[1], deformed_keypoints.shape[1])
+precision = num_good_matches / num_matches
+matching_score = num_good_matches / min(base_keypoints.shape[1], deformed_keypoints.shape[1])
 entropy = strain_entropy(s, base_matches.cpu(), W, H)
 
-print(f'DISK DSM Precision: {precision} ({good_matches} / {num_matches})')
+print(f'DISK DSM Precision: {precision} ({num_good_matches} / {num_matches})')
 print(f'DISK DSM Matching Score: {matching_score}')
 print(f'DISK DSM Number of Matches: {num_matches}')
 print(f'DISK DSM Entropy: {entropy}')
@@ -131,14 +134,14 @@ deformed_matches = feats1['keypoints'][matches[..., 1]]
 
 gt_pixel_coords = np.array([track_pixel_displacement(u, pixel, W, H, dW, dH, 10, 10, new_lx, new_ly, bottom_left) for pixel in base_matches.cpu()])
 distances = (deformed_matches.cpu() - gt_pixel_coords).norm(dim=1)
-good_matches = (distances < good_match_threshold).sum().item()
+num_good_matches = (distances < good_match_threshold).sum().item()
 
 num_matches = len(distances)
-precision = good_matches / num_matches
-matching_score = good_matches / min(len(feats0['keypoints']), len(feats1['keypoints']))
+precision = num_good_matches / num_matches
+matching_score = num_good_matches / min(len(feats0['keypoints']), len(feats1['keypoints']))
 entropy = strain_entropy(s, base_matches.cpu(), W, H)
 
-print(f'ALIKED LG Precision: {precision} ({good_matches} / {num_matches})')
+print(f'ALIKED LG Precision: {precision} ({num_good_matches} / {num_matches})')
 print(f'ALIKED LG Matching Score: {matching_score}')
 print(f'ALIKED LG Number of Matches: {num_matches}')
 print(f'ALIKED LG Entropy: {entropy}')
@@ -165,14 +168,14 @@ base_matches, deformed_matches, batch_ids = dsm_matcher.match(base_keypoints.to(
 
 gt_pixel_coords = np.array([track_pixel_displacement(u, pixel, W, H, dW, dH, 10, 10, new_lx, new_ly, bottom_left) for pixel in base_matches.cpu()])
 distances = (deformed_matches.cpu() - gt_pixel_coords).norm(dim=1)
-good_matches = (distances < good_match_threshold).sum().item()
+num_good_matches = (distances < good_match_threshold).sum().item()
 
 num_matches = len(distances)
-precision = good_matches / num_matches
-matching_score = good_matches / min(base_keypoints.shape[1], deformed_keypoints.shape[1])
+precision = num_good_matches / num_matches
+matching_score = num_good_matches / min(base_keypoints.shape[1], deformed_keypoints.shape[1])
 entropy = strain_entropy(s, base_matches.cpu(), W, H)
 
-print(f'ALIKED DSM Precision: {precision} ({good_matches} / {num_matches})')
+print(f'ALIKED DSM Precision: {precision} ({num_good_matches} / {num_matches})')
 print(f'ALIKED DSM Matching Score: {matching_score}')
 print(f'ALIKED DSM Number of Matches: {num_matches}')
 print(f'ALIKED DSM Entropy: {entropy}')
@@ -199,14 +202,14 @@ deformed_matches = feats1['keypoints'][matches[..., 1]]
 
 gt_pixel_coords = np.array([track_pixel_displacement(u, pixel, W, H, dW, dH, 10, 10, new_lx, new_ly, bottom_left) for pixel in base_matches.cpu()])
 distances = (deformed_matches.cpu() - gt_pixel_coords).norm(dim=1)
-good_matches = (distances < good_match_threshold).sum().item()
+num_good_matches = (distances < good_match_threshold).sum().item()
 
 num_matches = len(distances)
-precision = good_matches / num_matches
-matching_score = good_matches / min(len(feats0['keypoints']), len(feats1['keypoints']))
+precision = num_good_matches / num_matches
+matching_score = num_good_matches / min(len(feats0['keypoints']), len(feats1['keypoints']))
 entropy = strain_entropy(s, base_matches.cpu(), W, H)
 
-print(f'SP LG Precision: {precision} ({good_matches} / {num_matches})')
+print(f'SP LG Precision: {precision} ({num_good_matches} / {num_matches})')
 print(f'SP LG Matching Score: {matching_score}')
 print(f'SP LG Number of Matches: {num_matches}')
 print(f'SP LG Entropy: {entropy}')
@@ -233,14 +236,14 @@ base_matches, deformed_matches, batch_ids = dsm_matcher.match(base_keypoints.to(
 
 gt_pixel_coords = np.array([track_pixel_displacement(u, pixel, W, H, dW, dH, 10, 10, new_lx, new_ly, bottom_left) for pixel in base_matches.cpu()])
 distances = (deformed_matches.cpu() - gt_pixel_coords).norm(dim=1)
-good_matches = (distances < good_match_threshold).sum().item()
+num_good_matches = (distances < good_match_threshold).sum().item()
 
 num_matches = len(distances)
-precision = good_matches / num_matches
-matching_score = good_matches / min(base_keypoints.shape[1], deformed_keypoints.shape[1])
+precision = num_good_matches / num_matches
+matching_score = num_good_matches / min(base_keypoints.shape[1], deformed_keypoints.shape[1])
 entropy = strain_entropy(s, base_matches.cpu(), W, H)
 
-print(f'SP DSM Precision: {precision} ({good_matches} / {num_matches})')
+print(f'SP DSM Precision: {precision} ({num_good_matches} / {num_matches})')
 print(f'SP DSM Matching Score: {matching_score}')
 print(f'SP DSM Number of Matches: {num_matches}')
 print(f'SP DSM Entropy: {entropy}')
