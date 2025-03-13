@@ -112,7 +112,7 @@ def create_deformed_medical_image_pair(image_dir, deformed_image_dir, g_zy=12e6,
 
     fe.solve(A_ass, u.vector(), L_ass)
 
-    print(np.amax(u.vector()[:]))
+    # print(np.amax(u.vector()[:]))
 
     # --------------------
     # Post-process

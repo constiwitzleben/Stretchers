@@ -91,10 +91,13 @@ def print_matching_accuracy(base_matches, deformed_matches, np_image, deformatio
     print(f'Accuracy: {accuracy} ({good} / {total})')
 
 def strain_entropy(s,keypoints,W,H):
+    if len(keypoints) == 0:
+        return 0
     strain_values = np.array([get_strain(s, pixel, W, H, 10, 10) for pixel in keypoints])
-    min = np.amin(s.vector()[:])
-    max = np.amax(s.vector()[:])
-    hist, bin_edges = np.histogram(strain_values, bins=10, range=(min, max), density=True)
+    all_strain_values = s.vector()[:]
+    partitions = np.quantile(all_strain_values, np.linspace(0, 1, 11))
+    hist, bin_edges = np.histogram(strain_values, bins=partitions, density=False)
+    hist = hist / hist.sum()
     hist += 1e-10
     entropy = -np.sum(hist*np.log(hist))
     entropy /= np.log(10)  # Normalize by log
