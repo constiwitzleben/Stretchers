@@ -116,11 +116,88 @@ for i, deformation in enumerate(deformations):
 
     #--------------------------------------------------------------------------------------------------------------------------
 
-    matches01 = lg_matcher({'image0': feats0, 'image1': feats1})
-    feats0, feats1, matches01 = [rbd(x) for x in [feats0, feats1, matches01]]  # remove batch dimension
-    matches = matches01['matches']  # indices with shape (K,2)
-    base_matches = feats0['keypoints'][matches[..., 0]]  # coordinates in image #0, shape (K,2)
-    deformed_matches = feats1['keypoints'][matches[..., 1]]
+    # matches01 = lg_matcher({'image0': feats0, 'image1': feats1})
+    # feats0, feats1, matches01 = [rbd(x) for x in [feats0, feats1, matches01]]  # remove batch dimension
+    # matches = matches01['matches']  # indices with shape (K,2)
+    # base_matches = feats0['keypoints'][matches[..., 0]]  # coordinates in image #0, shape (K,2)
+    # deformed_matches = feats1['keypoints'][matches[..., 1]]
+
+    # New Version
+    best_matches = {}
+    base_keypoint_carrier = {}
+    best_scores = {}
+    best_descriptor_versions = {}
+
+    # print(pixel_base_keypoints.shape)
+    # print(stretched_descriptions.shape)
+    # print(pixel_detected_deformed_keypoints.shape)
+    # print(detected_deformed_descriptions.shape)
+    # print(base_img_size.shape)
+    # print(deformed_img_size.shape)
+
+    for i in range(stretched_descriptions.shape[0]):  # Iterate over batch
+
+        # feats0 = {
+        #     'keypoints': base_keypoints[None].to(device),
+        #     'descriptors': stretched_descriptions[i][None].to(device),
+        #     'image_size': base_img_size[None].to(device)
+        # }
+        # feats1 = {
+        #     'keypoints': deformed_keypoints[None].to(device),
+        #     'descriptors': deformed_descriptions[None].to(device),
+        #     'image_size': deformed_img_size[None].to(device)
+        # }
+
+        feats0['descriptors'] = stretched_descriptions[i][None].to(device)
+
+        affine_matches = lg_matcher({'image0': feats0, 'image1': feats1})
+
+        matches = affine_matches['matches'][0]
+        scores = affine_matches['scores'][0]  # Assuming LightGlue provides scores
+
+        # New Version
+        base_indices = matches[:, 0]  # Indices of matched keypoints in the base image
+        base_keypoints = feats0['keypoints'][0][matches[:,0]]  # Corresponding matched keypoints
+        deformed_keypoints = feats1['keypoints'][0][matches[:, 1]]  # Corresponding matched keypoints
+
+        for j in range(len(base_indices)):
+            keypoint_idx = base_indices[j].item()  # Convert to int for dictionary key
+            score = scores[j].item()
+
+            # If keypoint is not stored yet OR this match has a higher score, update it
+            if keypoint_idx not in best_matches or score > best_scores[keypoint_idx]:
+                best_matches[keypoint_idx] = deformed_keypoints[j]  # Save best-matching keypoint
+                base_keypoint_carrier[keypoint_idx] = base_keypoints[j]  # Save corresponding base keypoint
+                best_scores[keypoint_idx] = score  # Save best score
+                best_descriptor_versions[keypoint_idx] = i  # Track descriptor version
+
+    # Convert to tensors
+    unique_base_matches = torch.stack(list(base_keypoint_carrier.values()))  # Base keypoints
+    # unique_base_matches = torch.tensor(list(best_matches.keys()), device=device)  # Indices of best keypoints
+    unique_deformed_matches = torch.stack(list(best_matches.values()))  # Matched keypoints
+    unique_scores = torch.tensor(list(best_scores.values()), device=device)  # Best scores
+    descriptor_versions = torch.tensor(list(best_descriptor_versions.values()), device=device)  # Descriptor versions
+
+    # Select top 500 unique matches based on score
+    top_indices = unique_scores.argsort(descending=True)[:200]
+
+    base_matches = unique_base_matches[top_indices]  # Best 500 keypoints (indices)
+    # print(stretched_matches)
+    # print(stretched_matches.shape)
+    deformed_matches = unique_deformed_matches[top_indices]  # Best 500 matched keypoints
+    # print(deformed_matches)
+    # print(deformed_matches.shape)
+    matched_transformations = descriptor_versions[top_indices]  # Descriptor versions for these matches
+    # print(matched_transformations)
+    # print(matched_transformations.shape)
+
+    stretch_counts = torch.bincount(matched_transformations.to(torch.int64))
+    index = 5 if len(stretch_counts) > 5 else len(stretch_counts)
+    top5_counts, top5_indices = torch.topk(stretch_counts, index)
+    top5_percents = (top5_counts / stretch_counts.sum()) * 100
+    print(f'Top 5 stretches for matching:')
+    for i in range(index):
+        print(f'{tensors[top5_indices[i]]}: {top5_percents[i]:.0f}%')
 
     gt_pixel_coords = np.array([track_pixel_displacement(u, pixel, W, H, dW, dH, 10, 10, new_lx, new_ly, bottom_left) for pixel in base_matches.cpu()])
     distances = (deformed_matches.cpu() - gt_pixel_coords).norm(dim=1)
