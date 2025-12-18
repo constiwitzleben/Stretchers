@@ -18,58 +18,7 @@ To reproduce the exact environment used in the paper:
 conda env create -f environment.yml
 conda activate stretcher
 
----
-
-## 🔧 Installation
-
-1. **Clone the repository**
-
-```bash
-git clone https://github.com/<your-username>/stretcher.git
-cd stretcher
-Create and activate environment
-
-bash
-Copy code
-conda create -n stretcher python=3.10 -y
-conda activate stretcher
-Install dependencies
-
-bash
-Copy code
-pip install -U pip
-pip install torch torchvision numpy matplotlib pillow opencv-python lightglue
-Optional (for synthetic FEM experiments):
-
-bash
-Copy code
-conda install -c conda-forge fenics pyvista -y
-📁 Repository Structure
-css
-Copy code
-📦stretcher
-├── 📂data
-│   ├── SuperPoint_Descriptors_Dataset_Test.pth
-│   └── medical_deformed/
-├── 📂models
-│   ├── stretcher.pth
-│   └── spstretcher_new.pth
-├── 📂notebooks
-│   ├── dataset_creation.ipynb
-│   ├── model_training.ipynb
-│   ├── synthetic_matching.ipynb
-│   └── real_matching.ipynb
-├── 📂src
-│   └── notebook_utils.py
-├── 📂util
-│   ├── Affine_Transformations.py
-│   └── matching.py
-├── 📂matchers
-│   └── max_similarity.py
-├── models.py
-├── requirements.txt
-└── README.md
-🧠 Overview
+## 🧠 Overview
 The repository is organized to support the core experimental pipeline in the paper:
 
 Dataset Generation
@@ -84,7 +33,7 @@ Apply synthetic FEM deformations and evaluate matching performance against basel
 Real Matching Examples
 Demonstrate the method on real surgical image pairs.
 
-📓 Notebooks
+## 📓 Notebooks
 Notebook	Purpose
 dataset_creation.ipynb	Build descriptor deformation dataset
 model_training.ipynb	Train the Stretcher model
@@ -93,8 +42,8 @@ real_matching.ipynb	Apply to real image pairs
 
 Open each in Jupyter or VSCode and follow the linear workflow in the cells.
 
-🧰 Usage
-1) Descriptor Dataset Creation
+## 🧰 Usage
+### 1) Descriptor Dataset Creation
 Open the notebook:
 
 bash
@@ -110,7 +59,7 @@ Generate deformation modes
 
 Save a dataset (data/*.pth)
 
-2) Train the Stretcher Model
+### 2) Train the Stretcher Model
 bash
 Copy code
 jupyter notebook notebooks/model_training.ipynb
@@ -122,7 +71,7 @@ Load the descriptor dataset
 
 Train and save weights to models/stretcher.pth
 
-3) Synthetic Matching Evaluation
+### 3) Synthetic Matching Evaluation
 bash
 Copy code
 jupyter notebook notebooks/synthetic_matching.ipynb
@@ -134,13 +83,13 @@ Matching with and without Stretcher
 
 Quantitative analysis
 
-4) Real Matching
+### 4) Real Matching
 bash
 Copy code
 jupyter notebook notebooks/real_matching.ipynb
 Applies trained model to example real surgical pairs and visualizes descriptor matching.
 
-📦 Data
+## 📦 Data
 The repository includes:
 
 Descriptor dataset (.pth)
@@ -149,7 +98,7 @@ Example medical image pairs for evaluation
 
 If using your own images, update paths inside the notebooks or define a configuration.
 
-🧪 Evaluation
+## 🧪 Evaluation
 Matching performance is measured using:
 
 Baseline descriptor matching
@@ -158,7 +107,7 @@ Stretcher-augmented descriptor matching
 
 Synthetic ground truth from FEM deformation
 
-📖 Citation
+## 📖 Citation
 If you use this code in academic work, please cite:
 
 bibtex
@@ -171,7 +120,7 @@ Copy code
 📄 License
 This project is released under the MIT License. See the LICENSE file for details.
 
-🧡 Acknowledgements
+## 🧡 Acknowledgements
 Built on feature extractors such as SuperPoint and matchers like LightGlue
 
 Synthetic deformation using FEniCS (optional)
