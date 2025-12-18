@@ -17,6 +17,7 @@ To reproduce the exact environment used in the paper:
 ```bash
 conda env create -f environment.yml
 conda activate stretcher
+```
 
 ## 🧠 Overview
 The repository is organized to support the core experimental pipeline in the paper:
