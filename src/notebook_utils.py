@@ -1,21 +1,19 @@
+import os
+import time
 import numpy as np
+import torch
 from PIL import Image
 import matplotlib.pyplot as plt
-import time
-from sympy.core.kind import RaiseNotImplementedError
-import torch
 
-from lightglue import SuperPoint
+from lightglue import SuperPoint, LightGlue
 from lightglue.utils import load_image
 from DeDoDe.matchers.dual_softmax_matcher import DualSoftMaxMatcher
-from lightglue import LightGlue
+
 from .matching_util import draw_matches, draw_matching_comparison
-import os
 from .models import TripleNet
-from .affine_transformations import generate_strain_tensors, generate_27_strain_tensors
-import numpy as np
+from .affine_transformations import generate_strain_tensors, apply_corotated_strain_with_keypoints
 from .dsm_matching import StretcherDualSoftMaxMatcher
-import torch
+from .descriptors import sp_detect_and_describe, custom_sample_descriptors
 
 import fenics as fe
 import cv2
@@ -356,9 +354,6 @@ def create_dataset(
     Returns:
       non_deformed_descriptors (np.ndarray), deformed_descriptors (np.ndarray)
     """
-    from PIL import Image
-    from util.superpoint import sp_detect_and_describe, custom_sample_descriptors
-    from util.Affine_Transformations import apply_corotated_strain_with_keypoints
 
     kp_per_image = deformations_per_image*kp_per_deformation
 
