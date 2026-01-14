@@ -21,6 +21,17 @@ import fenics as fe
 import cv2
 import pyvista as pv
 
+def get_best_device(verbose = False):
+    device = torch.device('cpu')
+    if torch.cuda.is_available():
+        device = torch.device('cuda')
+    elif torch.backends.mps.is_available():
+        device = torch.device('mps')
+    else:
+        device = torch.device('cpu')
+    if verbose: print (f"Fastest device found is: {device}")
+    return device
+
 def load_images(im_path, deformed_im_path, figsize=(10, 5), titles=("Base image", "Deformed image")):
     """
     Load two images, strip alpha channels if present, display them side by side,
@@ -208,6 +219,7 @@ def stretched_matching(
     topk=500,
     baseline_img=None,
     save_dir='Visualisations',
+    save_name='stretched_matches.png',
     comparison_name='matches_comparison.png',
     image = True,
 ):
@@ -295,6 +307,9 @@ def stretched_matching(
         plt.title('Stretched matches')
         plt.axis('off')
         plt.show()
+
+        stretched_path = os.path.join(save_dir, save_name)
+        stretched_img.save(stretched_path)
 
         if baseline_img is not None:
             comparison_path = os.path.join(save_dir, comparison_name)
