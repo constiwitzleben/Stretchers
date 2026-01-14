@@ -9,12 +9,12 @@ from lightglue import SuperPoint
 from lightglue.utils import load_image
 from DeDoDe.matchers.dual_softmax_matcher import DualSoftMaxMatcher
 from lightglue import LightGlue
-from util.matching import draw_matches, draw_matching_comparison
+from .matching_util import draw_matches, draw_matching_comparison
 import os
-from models import TripleNet
-from util.Affine_Transformations import generate_strain_tensors, generate_27_strain_tensors
+from .models import TripleNet
+from .affine_transformations import generate_strain_tensors, generate_27_strain_tensors
 import numpy as np
-from matchers.max_similarity import StretcherDualSoftMaxMatcher
+from .dsm_matching import StretcherDualSoftMaxMatcher
 import torch
 
 import fenics as fe
