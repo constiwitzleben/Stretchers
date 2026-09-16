@@ -35,11 +35,15 @@ Real Matching Examples
 Demonstrate the method on real surgical image pairs.
 
 ## 📓 Notebooks
-Notebook	Purpose
-dataset_creation.ipynb	Build descriptor deformation dataset
-model_training.ipynb	Train the Stretcher model
-synthetic_matching.ipynb	Evaluate on FEM deformation
-real_matching.ipynb	Apply to real image pairs
+Notebook	Purpose:
+
+dataset_creation.ipynb -	Build descriptor deformation dataset
+
+model_training.ipynb -	Train the Stretcher model
+
+synthetic_matching.ipynb -	Evaluate on FEM deformation
+
+real_matching.ipynb -	Apply to real image pairs
 
 Open each in Jupyter or VSCode and follow the linear workflow in the cells.
 
