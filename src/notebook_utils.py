@@ -414,11 +414,15 @@ def create_dataset(
 # the single implementation used by both the notebooks and
 # scripts/evaluate_table1.py. These re-exports keep the notebook imports stable.
 
-def evaluate_matches(base_matches, deformed_matches, deformation_info):
+def evaluate_matches(base_matches, deformed_matches, deformation_info, threshold=5, label='Accuracy'):
+    """Score matches against the FEM ground truth and report the hit rate.
+
+    Returns the per-match pixel distances, so the caller can colour-code them.
+    """
     gt_pixel_coords = np.array([track_pixel_displacement(pixel, deformation_info) for pixel in base_matches.cpu()])
     distances = (deformed_matches.cpu() - gt_pixel_coords).norm(dim=1)
-    good = (distances < 5).sum().item()
+    good = (distances < threshold).sum().item()
     total = len(distances)
-    accuracy = good / total
-    print(f'Baseline Accuracy: {accuracy} ({good} / {total})')
+    accuracy = good / total if total else 0.0
+    print(f'{label}: {accuracy} ({good} / {total})')
     return distances

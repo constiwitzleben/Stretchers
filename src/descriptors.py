@@ -1,13 +1,17 @@
+"""SuperPoint keypoint detection and descriptor sampling.
+
+The dense feature map SuperPoint produces can be interpolated at arbitrary
+sub-pixel locations, which is what lets a keypoint detected in the rest image be
+described again at its exact deformed position - the correspondence the training
+pairs depend on (paper, Sec. 2.3.1).
+"""
+
 import torch
 from lightglue import SuperPoint
 from lightglue.utils import load_image
 import matplotlib.pyplot as plt
 import numpy as np
 from .affine_transformations import apply_corotated_strain_with_keypoints
-
-# ------------------------------------------------------------------------------
-# Inline extraction of a descriptor at a specific (x, y) location (e.g., (100, 200))
-# ------------------------------------------------------------------------------
 
 def custom_sample_descriptors(keypoints, descriptors, s: int = 8):
     """Interpolate descriptors at keypoint locations"""
@@ -28,9 +32,6 @@ def custom_sample_descriptors(keypoints, descriptors, s: int = 8):
     )
     return descriptors
 
-# ----------------------
-# OPTIONAL: Visualization of keypoints
-# ----------------------
 def plot_keypoints(image, keypoints):
     """Visualizes detected keypoints on an image."""
     plt.figure(figsize=(8, 6))
@@ -44,7 +45,6 @@ def plot_keypoints(image, keypoints):
 def sp_detect_and_describe(im, device, num_keypoints = 100):
     if im.dtype != np.uint8:
         im = np.array(im,dtype=np.uint8)
-    h, w = im.shape[:2]
     extractor = SuperPoint().eval().to(device)
     im = torch.tensor(im.transpose((2,0,1)) / 255.0, dtype=torch.float).to(device)
 
@@ -60,62 +60,14 @@ def sp_detect_and_describe(im, device, num_keypoints = 100):
 
 
 
-if __name__ == "__main__":
-
-    # Disable gradients for inference
-    torch.set_grad_enabled(False)
-
-    # Set device (GPU if available)
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-    # Load SuperPoint extractor (without limiting keypoints)
-    extractor = SuperPoint().eval().to(device)  # No max_num_keypoints, default is None
-
-    # Load test image
-    image0 = load_image("data/medical_deformed/brain.png")  # Returns a torch tensor
-    image0 = image0.to(device)
-
-    # Extract SuperPoint features
-    feats0 = extractor.extract(image0)
-
-    # Retrieve keypoints, descriptors, and scores
-    keypoints0 = feats0["keypoints"][0].cpu()  # (N, 2) keypoints in (x, y)
-    descriptors0 = feats0["descriptors"][0].cpu()  # (N, 256) descriptors
-    scores0 = feats0["keypoint_scores"][0].cpu()  # (N,) confidence scores
-
-    print(f"Extracted {keypoints0.shape[0]} keypoints.")
-
-    # Define the desired (x, y) coordinate
-    x, y = 100, 200
-
-    # Create a keypoint tensor with the desired coordinate.
-    # It must be a float tensor on the same device.
-    # Expected shape for sample_descriptors is (batch, num_points, 2), so we add the necessary dimensions.
-    keypoint_tensor = torch.tensor([[x, y]], dtype=torch.float32, device=device)  # Shape: (1, 2)
-    keypoint_tensor = keypoint_tensor.unsqueeze(0)  # Now shape: (1, 1, 2)
-
-    # Use the extractor's sample_descriptors method with a scale factor of 8 (typical for SuperPoint)
-    # The output has shape (B, descriptor_dim, num_points); here we index batch 0 and the first (and only) keypoint.
-    descriptor_at_xy = custom_sample_descriptors(keypoint_tensor, descriptors0, 8)[0, :, 0]
-    print(f"Descriptor at location ({x}, {y}) has shape: {descriptor_at_xy.shape}")
-
-    # ----------------------
-    # OPTIONAL: Visualization of keypoints
-    # ----------------------
-    def plot_keypoints(image, keypoints):
-        """Visualizes detected keypoints on an image."""
-        plt.figure(figsize=(8, 6))
-        plt.imshow(image.permute(1, 2, 0).cpu(), cmap="gray")
-        plt.scatter(keypoints[:, 0], keypoints[:, 1], c="r", s=5, label="Keypoints")
-        plt.title("SuperPoint Keypoints")
-        plt.legend()
-        plt.axis("off")
-        plt.show()
-
-    plot_keypoints(image0, keypoints0)
-
 def sp_get_affine_deformed_descriptions(image, pixel_keypoints, tensors, device):
+    """Ground-truth descriptors under each deformation, by re-running SuperPoint.
 
+    This is the expensive test-time augmentation baseline of Sec. 2.1: it deforms
+    the image and recomputes features once per hypothesis. Stretcher replaces it
+    with a single latent-space pass. Kept as the reference used to generate
+    training targets and to time the two approaches against each other.
+    """
     affine_deformed_descriptions = []
 
     # Loop over deformations

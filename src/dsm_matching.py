@@ -6,18 +6,30 @@ import numpy as np
 from DeDoDe.utils import to_pixel_coords, to_normalized_coords
 from .affine_transformations import generate_strain_tensors, generate_27_strain_tensors, generate_larger_strain_tensors
 
-def dual_softmax_matcher(stretched_descriptors: tuple['T','N','D'], base_descriptor: tuple['1','M','D'], inv_temperature = 1, normalize = False, stretch_type = 'normal', verbose = False):
+def dual_softmax_matcher(stretched_descriptors, base_descriptor, inv_temperature=1,
+                         normalize=False, stretch_type='normal', verbose=False):
+    """Dual-softmax matching that keeps the best score across deformation hypotheses.
+
+    Implements the max over hypotheses from Sec. 2.1 of the paper,
+    M_ij = max_k <d_i^{r,k}, d_j^d>, so a keypoint matches through whichever
+    simulated deformation best approximates the true local strain.
+
+    Args:
+        stretched_descriptors: (T, N, D) - N descriptors under T hypotheses.
+        base_descriptor: (1, M, D) - descriptors from the deformed image.
+
+    Returns:
+        (P, corr_indices): the match probability matrix, and for each pair the
+        index of the hypothesis that produced the winning score.
+    """
 
     T, N, D = stretched_descriptors.shape
     base_descriptor = base_descriptor.repeat(T, 1, 1)
-    M = base_descriptor.shape[1]
 
     if normalize:
         stretched_descriptors = stretched_descriptors/stretched_descriptors.norm(dim=-1,keepdim=True)
         base_descriptor = base_descriptor/base_descriptor.norm(dim=-1,keepdim=True)
     
-    # corr = torch.einsum("t n d, t m d -> t n m", stretched_descriptors, base_descriptor) * inv_temperature
-
     corr = torch.einsum("n d, m d -> n m", stretched_descriptors[0], base_descriptor[0]) * inv_temperature
     corr_indices = torch.zeros_like(corr)
 
@@ -26,9 +38,6 @@ def dual_softmax_matcher(stretched_descriptors: tuple['T','N','D'], base_descrip
         idx = torch.where(corr_next > corr)
         corr = torch.maximum(corr, corr_next)
         corr_indices[idx] = i
-
-    # Chose maximum value over T dimension
-    # corr, corr_indices = corr.max(dim = 0)
 
     corr = corr.unsqueeze(0)
     
@@ -47,7 +56,7 @@ def dual_softmax_matcher(stretched_descriptors: tuple['T','N','D'], base_descrip
         tensors = np.array(generate_strain_tensors())
 
     if verbose:
-        print(f'Top 5 stretches for max similarity:')
+        print('Top 5 stretches for max similarity:')
         for j in range(5):
             print(f'{tensors[top5_indices[j]]}: {top5_percents[j]:.0f}%')
 
@@ -94,16 +103,10 @@ class StretcherDualSoftMaxMatcher(nn.Module):
             tensors = np.array(generate_strain_tensors())
 
         if verbose:
-            print(f'Top 5 stretches for matching:')
+            print('Top 5 stretches for matching:')
             for i in range(index):
                 print(f'{tensors[top5_indices[i]]}: {top5_percents[i]:.0f}%')
 
-
-        # tensors = np.array(generate_strain_tensors())
-
-        # print(f'Top 5 stretches for max similarity:')
-        # for transformation, count in zip(unique_transformations, counts):
-        #     print(f'{tensors[transformation]}: {count}')
 
         return matches_A, matches_B, batch_inds
 

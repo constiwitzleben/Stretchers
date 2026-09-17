@@ -1,3 +1,11 @@
+"""Local affine strain model and image warping (paper, Sec. 2.2.1).
+
+Deformation is parameterised by (sigma_x, sigma_y, sigma_xy). The deformation
+gradient F = I + E is split by polar decomposition into a rigid rotation and a
+co-rotated stretch, so the strain applied to a patch is independent of any
+rotation it undergoes - the formulation borrowed from co-rotational FEM.
+"""
+
 import numpy as np
 import matplotlib.pyplot as plt
 from skimage.transform import warp, AffineTransform
@@ -189,18 +197,7 @@ def display_images_in_pages(image, tensors, rows=5, cols=5):
         for i, tensor in enumerate(tensors_on_page):
             deformed_image = apply_corotated_strain(image, tensor)
 
-            height, width = deformed_image.shape[:2]
-            center_y, center_x = height // 2, width // 2
-
-            crop_size = 64
-            top_left_y = center_y - crop_size // 2
-            top_left_x = center_x - crop_size // 2
-
-            # Crop the image
-            cropped_patch = deformed_image[top_left_y:top_left_y + crop_size, top_left_x:top_left_x + crop_size]
-
             axes[i].imshow(deformed_image, cmap='gray', vmin=0, vmax=1)
-            #axes[i].imshow(cropped_patch, cmap='gray')
             axes[i].axis('off')
             axes[i].set_title(f"{tensor[0]:.2f},{tensor[1]:.2f},{tensor[2]:.2f}")
 
@@ -214,70 +211,6 @@ def display_images_in_pages(image, tensors, rows=5, cols=5):
         # Pause to allow navigation between pages
         input(f"Press Enter to see the next page (page {page + 2} of {pages})...")
 
-
-def apply_transformation_from_index(image, index, origin):
-    tensors = generate_strain_tensors()
-    
-
-
-
-# Main
-# image_size = 100
-# block_size = 5
-# padding = 100  # Prevent clipping
-
-# # Create and pad chessboard image
-# image = create_chessboard(size=image_size, block_size=block_size)
-# image = io.imread('patch.png', as_gray=True)
-# image = pad(image, padding, mode="constant", constant_values=0)
-
-'''
-# Define a strain tensor
-strain_tensor = np.array([[0.12, 0.5], 
-                          [0.5, 0.12]])  # Example high-strain tensor
-
-# Compute deformation gradient
-F = deformation_gradient_from_strain(strain_tensor)
-
-# Perform polar decomposition
-R, F_strain = polar_decomposition(F)
-
-# Apply corotated strain transformation
-corotated_deformed_image = apply_corotated_strain(image, F_strain)
-
-# Apply pure strain transformation
-deformed_image = apply_strain(image, F_strain)
-
-
-
-
-# Plot the results
-plt.figure(figsize=(12, 5))
-plt.subplot(1, 2, 1)
-plt.title("Original Image")
-plt.imshow(image, cmap="gray")
-plt.axis("off")
-
-#plt.subplot(1, 3, 2)
-#plt.title("Deformed Image ")
-#plt.imshow(deformed_image, cmap="gray")
-#plt.axis("off")
-
-plt.subplot(1, 2, 2)
-plt.title("Deformed Image (Co-Rotational)")
-plt.imshow(corotated_deformed_image, cmap="gray")
-plt.axis("off")
-
-plt.tight_layout()
-plt.show()
-'''
-
-# # Generate strain tensors
-# strain_tensors = generate_strain_tensors()
-# print(strain_tensors)
-    
-# # Display images in pages of 25
-# display_images_in_pages(image, strain_tensors)
 
 def apply_corotated_strain_with_keypoints(image, keypoints, s, dataset_mode=True):
 
