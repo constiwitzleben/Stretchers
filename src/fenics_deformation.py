@@ -1,6 +1,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import cv2
+from PIL import Image
 
 # ---------------------------------------------------------------------------
 # FEniCS / PyVista import
@@ -84,7 +85,11 @@ def von_mises_strain(E,u):
         return fe.sqrt(0.5 * ((E[0, 0] - E[1, 1])**2 + (E[1, 1] - E[2, 2])**2 + 
                               (E[2, 2] - E[0, 0])**2 + 6 * (E[0, 1]**2 + E[1, 2]**2 + E[2, 0]**2)))
 
-def create_deformed_medical_image_pair(image_dir, deformed_image_dir, g_zy=12e6, g_zx=1e6):
+def create_deformed_medical_image_pair(image_dir, deformed_image_dir, g_zy=12e6, g_zx=1e6, show=True):
+
+    _require_fem()
+
+    _require_fem()
 
     # --------------------
     # Parameters
@@ -121,7 +126,6 @@ def create_deformed_medical_image_pair(image_dir, deformed_image_dir, g_zy=12e6,
     # --------------------
     mesh = fe.RectangleMesh(fe.Point(0.0, 0.0), fe.Point(l_x, l_y), n_x, n_y)
 
-
     # Definition of Neumann condition domain
     boundaries = fe.MeshFunction("size_t", mesh, mesh.topology().dim() - 1)
     boundaries.set_all(0)
@@ -157,52 +161,16 @@ def create_deformed_medical_image_pair(image_dir, deformed_image_dir, g_zy=12e6,
 
     fe.solve(A_ass, u.vector(), L_ass)
 
-    # print(np.amax(u.vector()[:]))
-
     # --------------------
     # Post-process
     # --------------------
-    # plt.clf()
-    # fe.plot(u, mode="displacement")
-    # fe.plot(mesh)
-    # plt.show()
 
     F = fe.Identity(len(u)) + fe.grad(u)
     E = 0.5 * (F.T * F - fe.Identity(len(u)))
     V_scalar = fe.FunctionSpace(mesh, "P", 1)  # Scalar function space
     strain_vm = fe.project(von_mises_strain(E,u), V_scalar)
 
-    # print("Min strain:", np.min(strain_vm.vector()[:]))
-    # print("Max strain:", np.max(strain_vm.vector()[:]))
-
-    # plt.figure()
-    # p = fe.plot(strain_vm, cmap="viridis", vmin=0,vmax=3)  # Choose a color map
-    # plt.colorbar(p)
-    # plt.title("Von Mises Strain Field")
-    # plt.show()
-
-
-    # s = sigma(u, lambda_, mu)
-
-    # V_vm = fe.FunctionSpace(mesh, "P", 1)  # Scalar function space
-    # sigma_vm = fe.project(von_mises_stress(s), V_vm)
-
-    # # Plot results
-    # plt.clf()
-    # fig, ax = plt.subplots()
-    # p = fe.plot(sigma_vm, cmap="viridis")  # Choose a colormap, e.g., "viridis" or "jet"
-    # fig.colorbar(p, ax=ax, label="Von Mises Stress")
-    # plt.show()
-
     displacements_at_vertices = np.array([u(x) for x in mesh.coordinates()])
-
-    # updated_coords = mesh.coordinates() + displacements_at_vertices
-    # mesh.coordinates()[:] = updated_coords
-    # fe.plot(mesh, title="Deformed Mesh")
-    # #Save plot
-    # plt.savefig("Visualisations/deformed_mesh.png", dpi=300, bbox_inches='tight')
-    
-
 
     # --------------------
     # Create PyVista Plane
@@ -218,13 +186,11 @@ def create_deformed_medical_image_pair(image_dir, deformed_image_dir, g_zy=12e6,
 
     # Apply displacements to the PyVista Plane
     plane_points = plane.points
-    #print(plane_points)
 
     for i, point in enumerate(plane_points):
         point[:2] += displacements_at_vertices[i]  # Apply x and y displacements
 
     plane.points = plane_points
-    #print(plane.points)
 
     # Load a texture image
     texture = pv.read_texture(image_dir)
@@ -236,7 +202,6 @@ def create_deformed_medical_image_pair(image_dir, deformed_image_dir, g_zy=12e6,
 
 
     # Apply the texture and visualize
-    # plotter = pv.Plotter(window_size=[400, 800])
     plotter = pv.Plotter(off_screen=True)
     plotter.enable_anti_aliasing()
     plotter.enable_image_style()
@@ -268,22 +233,51 @@ def create_deformed_medical_image_pair(image_dir, deformed_image_dir, g_zy=12e6,
     aspect_ratio = (bounds[1] - bounds[0]) / (bounds[3] - bounds[2])
     window_height = int(img_height * ((bounds[3] - bounds[2])/l_y))  # for example, choose a height in pixels
     window_width = int(window_height * aspect_ratio)
-    # window_width = int(img_width * ((bounds[1] - bounds[0])/l_x))
     plotter.window_size = (window_width, window_height)
 
     # Render and capture the screenshot
-    #plotter.add_mesh(plane, style='wireframe')
     plotter.add_mesh(plane, texture=texture, interpolate_before_map=True)
-    #plotter.show_axes()
-    #plotter.show()
-    # plotter.show(screenshot=deformed_image_dir)
     cv2.imwrite(deformed_image_dir, cv2.cvtColor(plotter.screenshot(), cv2.COLOR_RGB2BGR))
 
-    return u, strain_vm, new_lx, new_ly, bottom_left
+    base_image = Image.open(image_dir)
+    deformed_image = Image.open(deformed_image_dir)
+    W, H = base_image.size
+    # print(W,H)
+    dW, dH = deformed_image.size
+    # print(dW,dH)
+    base_image = np.array(base_image, dtype=np.uint8)
+    if base_image.shape[-1] == 4:
+        base_image = base_image[:,:,:3]
+    deformed_image = np.array(deformed_image, dtype=np.uint8)
+    if deformed_image.shape[-1] == 4:
+        deformed_image = deformed_image[:,:,:3]
 
-# u, new_lx, new_ly = create_deformed_medical_image_pair("data/medical_deformed/brain.png")
+    if show:
+        fig, axes = plt.subplots(1, 2, figsize=(10, 5))
+        axes[0].imshow(base_image)
+        axes[0].set_title("Base Image")
+        axes[0].axis('off')
+        axes[1].imshow(deformed_image)
+        axes[1].set_title("Deformed Image")
+        axes[1].axis('off')
+        plt.tight_layout()
+        plt.show()
 
-def track_pixel_displacement(u, pixel_coords, img_width, img_height, new_img_width, new_img_height, l_x, l_y, new_l_x, new_l_y, bottom_left):
+    deformation_info = {
+        'W': W,
+        'H': H,
+        'dW': dW,
+        'dH': dH,
+        'u': u,
+        's': strain_vm,
+        'new_lx': new_lx,
+        'new_ly': new_ly,
+        'bottom_left': bottom_left,
+    }
+
+    return base_image, deformed_image, deformation_info
+
+def track_pixel_displacement(pixel_coords, deformation_info):
     """
     Given the displacement field `u`, track where a pixel at `pixel_coords` moves after deformation.
     
@@ -298,6 +292,18 @@ def track_pixel_displacement(u, pixel_coords, img_width, img_height, new_img_wid
     Returns:
         (i', j'): The new pixel coordinates in the deformed image.
     """
+    # Unpack deformation info
+    img_width = deformation_info['W']
+    img_height = deformation_info['H']
+    new_img_width = deformation_info['dW']
+    new_img_height = deformation_info['dH']
+    u = deformation_info['u']
+    new_l_x = deformation_info['new_lx']
+    new_l_y = deformation_info['new_ly']
+    bottom_left = deformation_info['bottom_left']
+    l_x = 10
+    l_y = 10
+
     # Convert pixel coordinates to physical space
     x = (pixel_coords[0] / img_width) * l_x
     y = (1-(pixel_coords[1] / img_height)) * l_y
@@ -317,6 +323,7 @@ def track_pixel_displacement(u, pixel_coords, img_width, img_height, new_img_wid
     j_new = (1-(y_new / new_l_y)) * new_img_height
     
     return (i_new, j_new)
+
 
 def get_strain(s,pixel, img_width, img_height, l_x, l_y):
     """
