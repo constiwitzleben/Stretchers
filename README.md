@@ -120,13 +120,17 @@ The shear discretisation {−0.4, −0.2, 0, 0.2, 0.4} matches the paper. Polar 
 separate a rigid rotation from a co-rotated stretch and are equivalent for these deformations;
 polar is the standard choice in co-rotational FEM.
 
-Two further notes on reproducibility:
+Three further notes on reproducibility:
 
 - Table 1 reports `−` for the Stretcher + LightGlue match score. That cell was produced by code
   that called `len()` on a batched tensor, yielding `1` instead of the keypoint count. The
   corrected value is computed above.
 - The `200.0 ± 0.0` match count on the same row is a hardcoded top-200 cap on scored matches,
   exposed here as `--lg-topk`.
+- `model_training.ipynb` implements Eq. 2 (mean squared error). The released checkpoint was
+  produced by an earlier revision of the training code, so retraining is not expected to
+  reproduce it bit-for-bit — which is why the notebook writes to a separate
+  `models/stretcher_retrained.pth` rather than overwriting the released weights.
 
 ---
 
