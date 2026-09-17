@@ -16,8 +16,19 @@ def create_chessboard(size=100, block_size=10):
     return image
 
 
- # Generate 125 strain tensors
 def generate_strain_tensors():
+    """The 5 x 5 x 5 = 125 candidate local affine deformation modes (paper, Sec. 2.3.1).
+
+    Returns a list of (sigma_x, sigma_y, sigma_xy) triples. This grid is used in two
+    places: to generate the supervised training pairs (notebook_utils.create_dataset)
+    and as the inference-time hypothesis set (notebook_utils.stretch_descriptions).
+
+    Erratum: Sec. 2.3.1 of the published paper states that sigma_x and sigma_y are
+    discretised into {-1, -0.5, 0, 0.5, 1}. The values actually used - here and in the
+    original training code - are {-0.5, -0.25, 0, 0.5, 1}. The shear discretisation
+    {-0.4, -0.2, 0, 0.2, 0.4} matches the paper. The released weights were trained on
+    this grid, so it is left unchanged.
+    """
     strain_xx = np.array([-0.5, -0.25, 0.0, 0.5, 1.0])  # Stretching values
     strain_yy = np.array([-0.5, -0.25, 0.0, 0.5, 1.0])  # Stretching values
     # shear_xy1 = np.linspace(-0.9, -0.5, 2)   # Shear strain
@@ -63,8 +74,14 @@ def generate_27_strain_tensors():
 def generate_test_strain_tensors():
     return [[0.5,0.5,0.0],[0.0,0.0,0.0],[-0.25,-0.25,0.0]]
 
-# Perform polar decomposition
 def polar_decomposition(F):
+    """Split a deformation gradient into rotation and stretch: F = R U (paper, Sec. 2.2.1).
+
+    Sec. 2.2.1 describes this as a QR decomposition F = RS. The implementation uses an
+    SVD-based polar decomposition instead. Both isolate a rigid rotation from a
+    co-rotated stretch, and the resulting strain is equivalent for the deformations
+    used here; polar is the standard choice in co-rotational FEM.
+    """
     U, S, Vt = np.linalg.svd(F)
     R = U @ Vt  # Rotation matrix
     U_stretch = Vt.T @ np.diag(S) @ Vt  # Pure strain component

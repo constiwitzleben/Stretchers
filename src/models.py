@@ -125,6 +125,16 @@ class MLP(nn.Module):
         return self.model(x)
 
 class TripleNet(nn.Module):
+    """The Stretcher descriptor transformation network (paper, Sec. 2.2.2, Eq. 1).
+
+    Three lightweight MLPs, one per strain component, whose outputs are summed and
+    added to the original descriptor:  rho(alpha, d) = d + sum_i MLP_i(alpha, d).
+
+    The residual form keeps descriptors stable under small deformations while
+    adapting them selectively under larger strain. A zero strain vector is returned
+    unchanged, short-circuiting the identity hypothesis.
+    """
+
     def __init__(self, descriptor_dim=256, parameter_dim=3, hidden_dim=256, num_layers=2, num_nets=3):
         super(TripleNet, self).__init__()
         
