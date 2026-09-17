@@ -40,8 +40,13 @@ dependencies:
   # --- pulled in by fenics; pinned to the known-good versions ---
   - numpy=2.0.2
 
-  # --- notebook kernel ---
+  # --- notebooks ---
+  # The repository's primary interface is the four notebooks, so ship a working
+  # Jupyter. nbconvert additionally allows headless execution:
+  #   jupyter nbconvert --to notebook --execute real_matching.ipynb
   - ipykernel=6.30.1
+  - jupyterlab
+  - nbconvert
 
   - pip:
       # --- deep learning ---
