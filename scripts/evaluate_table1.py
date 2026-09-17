@@ -265,10 +265,6 @@ def main():
 
 def report(results, args):
     """Print Table 1 and write it to CSV, Markdown and JSON."""
-    header = f"{'Matcher':<8}{'Method':<12}{'Prec. (%)':>16}{'Match Sc. (%)':>18}{'# Matches':>16}{'Entropy':>14}{'SBP':>14}"
-    print("\n" + header)
-    print("-" * len(header))
-
     rows = []
     for matcher_name in args.matchers:
         for method in args.methods:
@@ -279,21 +275,49 @@ def report(results, args):
             rows.append({"matcher": matcher_name, "method": method,
                          **{f"{m}_{s}": stats[m][i] for m in METRICS
                             for i, s in enumerate(("mean", "std"))}})
-            print(f"{matcher_name.upper():<8}{method:<12}"
-                  f"{stats['precision'][0]*100:>9.2f} ± {stats['precision'][1]*100:<5.2f}"
-                  f"{stats['matching_score'][0]*100:>11.2f} ± {stats['matching_score'][1]*100:<5.2f}"
-                  f"{stats['num_matches'][0]:>9.2f} ± {stats['num_matches'][1]:<5.2f}"
-                  f"{stats['entropy'][0]:>8.2f} ± {stats['entropy'][1]:<5.2f}"
-                  f"{stats['sb_precision'][0]:>8.2f} ± {stats['sb_precision'][1]:<5.2f}")
 
     os.makedirs(args.output, exist_ok=True)
-
     csv_path = os.path.join(args.output, "table1.csv")
+
+    # Merge with any previous run so the expensive rows (Stretcher+LightGlue
+    # runs the matcher once per hypothesis) can be evaluated separately and
+    # still assemble into one table.
+    merged = {}
+    if os.path.exists(csv_path):
+        with open(csv_path) as fh:
+            header = fh.readline().rstrip("\n").split(",")
+            for line in fh:
+                if not line.strip():
+                    continue
+                cells = line.rstrip("\n").split(",")
+                prev = dict(zip(header, cells))
+                for k in header[2:]:
+                    prev[k] = float(prev[k])
+                merged[(prev["matcher"], prev["method"])] = prev
+    for r in rows:
+        merged[(r["matcher"], r["method"])] = r
+
+    order = {"dsm": 0, "lg": 1}
+    rows = sorted(merged.values(),
+                  key=lambda r: (order.get(r["matcher"], 9), list(EXTRACTORS).index(r["method"])
+                                 if r["method"] in EXTRACTORS else 9))
+
     with open(csv_path, "w") as fh:
         fh.write("matcher,method," + ",".join(f"{m}_mean,{m}_std" for m in METRICS) + "\n")
         for r in rows:
             fh.write(f"{r['matcher']},{r['method']},"
                      + ",".join(f"{r[f'{m}_mean']:.6f},{r[f'{m}_std']:.6f}" for m in METRICS) + "\n")
+
+    header = f"{'Matcher':<8}{'Method':<12}{'Prec. (%)':>16}{'Match Sc. (%)':>18}{'# Matches':>16}{'Entropy':>14}{'SBP':>14}"
+    print("\n" + header)
+    print("-" * len(header))
+    for r in rows:
+        print(f"{r['matcher'].upper():<8}{r['method']:<12}"
+              f"{r['precision_mean']*100:>9.2f} ± {r['precision_std']*100:<5.2f}"
+              f"{r['matching_score_mean']*100:>11.2f} ± {r['matching_score_std']*100:<5.2f}"
+              f"{r['num_matches_mean']:>9.2f} ± {r['num_matches_std']:<5.2f}"
+              f"{r['entropy_mean']:>8.2f} ± {r['entropy_std']:<5.2f}"
+              f"{r['sb_precision_mean']:>8.2f} ± {r['sb_precision_std']:<5.2f}")
 
     md_path = os.path.join(args.output, "table1.md")
     with open(md_path, "w") as fh:
