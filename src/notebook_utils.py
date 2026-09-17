@@ -368,8 +368,13 @@ def create_dataset(
 
     kp_per_image = deformations_per_image*kp_per_deformation
 
-    image_names = os.listdir(image_dir)
-    num_images = len(image_names) if max_images is None else max_images
+    # Only real images, in a deterministic order, so runs are reproducible and
+    # stray files (.DS_Store and friends) cannot break the loop.
+    exts = ('.png', '.jpg', '.jpeg', '.tif', '.tiff', '.bmp')
+    image_names = sorted(f for f in os.listdir(image_dir) if f.lower().endswith(exts))
+    if not image_names:
+        raise FileNotFoundError(f"no images found in {image_dir!r}")
+    num_images = len(image_names) if max_images is None else min(max_images, len(image_names))
     print(f'Number of images: {num_images}')
     non_deformed_descriptors = np.zeros((num_images*deformations_per_image*kp_per_deformation, 256))
     deformed_descriptors = np.zeros((num_images*deformations_per_image*kp_per_deformation, 256))
@@ -380,7 +385,9 @@ def create_dataset(
 
     for i, image_name in enumerate(image_names[:max_images]):
         image_path = os.path.join(image_dir, image_name)
-        image = Image.open(image_path)
+        # convert() handles RGBA, palette and greyscale alike; SuperPoint needs
+        # three channels and several of the shipped PNGs carry an alpha one.
+        image = Image.open(image_path).convert('RGB')
         W, H = image.size
         image = image.resize((W // 2, H // 2))
         image = np.array(image, dtype=np.uint8)

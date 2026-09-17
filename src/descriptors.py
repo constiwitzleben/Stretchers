@@ -45,6 +45,10 @@ def plot_keypoints(image, keypoints):
 def sp_detect_and_describe(im, device, num_keypoints = 100):
     if im.dtype != np.uint8:
         im = np.array(im,dtype=np.uint8)
+    if im.ndim == 3 and im.shape[-1] == 4:       # drop alpha; SuperPoint wants RGB
+        im = im[:, :, :3]
+    elif im.ndim == 2:                            # greyscale -> RGB
+        im = np.repeat(im[:, :, None], 3, axis=2)
     extractor = SuperPoint().eval().to(device)
     im = torch.tensor(im.transpose((2,0,1)) / 255.0, dtype=torch.float).to(device)
 
