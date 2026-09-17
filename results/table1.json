@@ -1,12 +1,9 @@
 {
   "config": {
     "methods": [
-      "disk",
-      "aliked",
-      "sp"
+      "stretcher"
     ],
     "matchers": [
-      "dsm",
       "lg"
     ],
     "image": "data/medical_deformed/pig_liver_to_elongate.png",
@@ -25,44 +22,44 @@
     {
       "matcher": "dsm",
       "method": "disk",
-      "precision_mean": 0.24843260188087773,
-      "precision_std": 0.2507971685254282,
-      "matching_score_mean": 0.0030517578125,
-      "matching_score_std": 0.003056636724987528,
+      "precision_mean": 0.248433,
+      "precision_std": 0.250797,
+      "matching_score_mean": 0.003052,
+      "matching_score_std": 0.003057,
       "num_matches_mean": 16.25,
-      "num_matches_std": 9.67923034130297,
-      "entropy_mean": 0.1639148028083357,
-      "entropy_std": 0.16555344409839187,
-      "sb_precision_mean": 0.08823529411764706,
-      "sb_precision_std": 0.08836863563034124
+      "num_matches_std": 9.67923,
+      "entropy_mean": 0.163915,
+      "entropy_std": 0.165553,
+      "sb_precision_mean": 0.088235,
+      "sb_precision_std": 0.088369
     },
     {
       "matcher": "dsm",
       "method": "aliked",
-      "precision_mean": 0.2556528265446747,
-      "precision_std": 0.23782954405672121,
-      "matching_score_mean": 0.17656409053806757,
-      "matching_score_std": 0.1702821461699076,
+      "precision_mean": 0.255653,
+      "precision_std": 0.23783,
+      "matching_score_mean": 0.176564,
+      "matching_score_std": 0.170282,
       "num_matches_mean": 359.25,
-      "num_matches_std": 55.033512517374355,
-      "entropy_mean": 0.6036358648546054,
-      "entropy_std": 0.12297461117217708,
-      "sb_precision_mean": 0.19929946328850282,
-      "sb_precision_std": 0.1804138185458555
+      "num_matches_std": 55.033513,
+      "entropy_mean": 0.603636,
+      "entropy_std": 0.122975,
+      "sb_precision_mean": 0.199299,
+      "sb_precision_std": 0.180414
     },
     {
       "matcher": "dsm",
       "method": "sp",
-      "precision_mean": 0.2898563571346455,
-      "precision_std": 0.13109627978398103,
-      "matching_score_mean": 0.12902517025171567,
-      "matching_score_std": 0.06576874491832878,
+      "precision_mean": 0.289856,
+      "precision_std": 0.131096,
+      "matching_score_mean": 0.129025,
+      "matching_score_std": 0.065769,
       "num_matches_mean": 173.5,
-      "num_matches_std": 31.571347769773784,
-      "entropy_mean": 0.8734221646566431,
-      "entropy_std": 0.04801155119249754,
-      "sb_precision_mean": 0.27202869920261663,
-      "sb_precision_std": 0.1169250134470101
+      "num_matches_std": 31.571348,
+      "entropy_mean": 0.873422,
+      "entropy_std": 0.048012,
+      "sb_precision_mean": 0.272029,
+      "sb_precision_std": 0.116925
     },
     {
       "matcher": "dsm",
@@ -81,44 +78,58 @@
     {
       "matcher": "lg",
       "method": "disk",
-      "precision_mean": 0.7107346826432929,
-      "precision_std": 0.4107787551107213,
-      "matching_score_mean": 0.2850341796875,
-      "matching_score_std": 0.1963887507154754,
+      "precision_mean": 0.710735,
+      "precision_std": 0.410779,
+      "matching_score_mean": 0.285034,
+      "matching_score_std": 0.196389,
       "num_matches_mean": 614.0,
-      "num_matches_std": 417.3170257729727,
-      "entropy_mean": 0.5778168989364636,
-      "entropy_std": 0.33813604337775166,
-      "sb_precision_mean": 0.593218124568996,
-      "sb_precision_std": 0.3633684163960379
+      "num_matches_std": 417.317026,
+      "entropy_mean": 0.577817,
+      "entropy_std": 0.338136,
+      "sb_precision_mean": 0.593218,
+      "sb_precision_std": 0.363368
     },
     {
       "matcher": "lg",
       "method": "aliked",
-      "precision_mean": 0.9474626017605453,
-      "precision_std": 0.059495967073376656,
-      "matching_score_mean": 0.6229346781064253,
-      "matching_score_std": 0.20076603861620335,
+      "precision_mean": 0.947463,
+      "precision_std": 0.059496,
+      "matching_score_mean": 0.622935,
+      "matching_score_std": 0.200766,
       "num_matches_mean": 405.0,
-      "num_matches_std": 108.60248615938771,
-      "entropy_mean": 0.8849709560690082,
-      "entropy_std": 0.04172717302642329,
-      "sb_precision_mean": 0.8817638619880903,
-      "sb_precision_std": 0.12307492185103935
+      "num_matches_std": 108.602486,
+      "entropy_mean": 0.884971,
+      "entropy_std": 0.041727,
+      "sb_precision_mean": 0.881764,
+      "sb_precision_std": 0.123075
     },
     {
       "matcher": "lg",
       "method": "sp",
-      "precision_mean": 0.8592060153986907,
-      "precision_std": 0.1070383488227628,
-      "matching_score_mean": 0.23705763282440634,
-      "matching_score_std": 0.13579151782021756,
+      "precision_mean": 0.859206,
+      "precision_std": 0.107038,
+      "matching_score_mean": 0.237058,
+      "matching_score_std": 0.135792,
       "num_matches_mean": 111.25,
-      "num_matches_std": 67.05361660641431,
-      "entropy_mean": 0.8016417016602313,
-      "entropy_std": 0.1595379029270065,
-      "sb_precision_mean": 0.7335132922632923,
-      "sb_precision_std": 0.23300442360985876
+      "num_matches_std": 67.053617,
+      "entropy_mean": 0.801642,
+      "entropy_std": 0.159538,
+      "sb_precision_mean": 0.733513,
+      "sb_precision_std": 0.233004
+    },
+    {
+      "matcher": "lg",
+      "method": "stretcher",
+      "precision_mean": 0.7525000000000001,
+      "precision_std": 0.11776565713313877,
+      "matching_score_mean": 0.3756414994197051,
+      "matching_score_std": 0.024017762687351393,
+      "num_matches_mean": 200.0,
+      "num_matches_std": 0.0,
+      "entropy_mean": 0.9102291500807865,
+      "entropy_std": 0.05415942904001879,
+      "sb_precision_mean": 0.707275922709139,
+      "sb_precision_std": 0.15309476444995462
     }
   ]
 }
