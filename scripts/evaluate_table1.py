@@ -147,34 +147,68 @@ def match_lightglue_stretched(lg, feats0, feats1, stretched, device, topk):
     slows down accordingly. Inference only - results are unchanged.
     """
     best_def, best_base, best_score = {}, {}, {}
+    feats0 = dict(feats0)
 
     for h in range(stretched.shape[0]):
-        feats0 = dict(feats0)
         feats0["descriptors"] = stretched[h][None].to(device)
         out = lg({"image0": feats0, "image1": feats1})
         matches, scores = out["matches"][0], out["scores"][0]
 
-        base_kp = feats0["keypoints"][0][matches[:, 0]]
-        def_kp = feats1["keypoints"][0][matches[:, 1]]
+        # .cpu() rather than keeping device views: a stored view pins the whole
+        # tensor it indexes into, and LightGlue's attention intermediates over
+        # 2048x2048 keypoints are large. Without this the MPS caching allocator
+        # grows past 8 GB across the 125 hypotheses and the machine swaps.
+        base_kp = feats0["keypoints"][0][matches[:, 0]].cpu()
+        def_kp = feats1["keypoints"][0][matches[:, 1]].cpu()
+        idxs = matches[:, 0].cpu().tolist()
+        scores_l = scores.cpu().tolist()
 
-        for j, idx_t in enumerate(matches[:, 0]):
-            idx, score = int(idx_t.item()), float(scores[j].item())
+        for j, idx in enumerate(idxs):
+            score = scores_l[j]
             if idx not in best_score or score > best_score[idx]:
-                best_def[idx], best_base[idx], best_score[idx] = def_kp[j], base_kp[j], score
+                best_def[idx] = def_kp[j].clone()
+                best_base[idx] = base_kp[j].clone()
+                best_score[idx] = score
+
+        del out, matches, scores, base_kp, def_kp
+        if device.type == "mps" and h % 16 == 15:
+            torch.mps.empty_cache()
 
     if not best_score:
         raise RuntimeError("no LightGlue matches across any deformation hypothesis")
 
-    base = torch.stack(list(best_base.values()))
-    deformed = torch.stack(list(best_def.values()))
+    base = torch.stack(list(best_base.values())).to(device)
+    deformed = torch.stack(list(best_def.values())).to(device)
     order = torch.tensor(list(best_score.values()), device=device).argsort(descending=True)[:topk]
     return base[order], deformed[order]
 
 
+# Models are cached: evaluate() is called once per (method, matcher, deformation),
+# so building them per call instantiated 32 networks over a full run. None were
+# released promptly by the MPS caching allocator, so resident memory grew past
+# 10 GB and the machine swapped - which slowed the LightGlue rows by roughly 9x.
+_MODEL_CACHE = {}
+
+
+def _extractor(method, device, num_keypoints):
+    key = ("extractor", method, num_keypoints)
+    if key not in _MODEL_CACHE:
+        cls, _ = EXTRACTORS[method]
+        _MODEL_CACHE[key] = cls(max_num_keypoints=num_keypoints).eval().to(device)
+    return _MODEL_CACHE[key]
+
+
+def _lightglue(method, device):
+    _, feature = EXTRACTORS[method]
+    key = ("lg", feature)
+    if key not in _MODEL_CACHE:
+        _MODEL_CACHE[key] = LightGlue(features=feature).eval().to(device)
+    return _MODEL_CACHE[key]
+
+
 def evaluate(method, matcher_name, paths, info, device, stretcher, args):
     """Run one (method, matcher) cell of the table for one deformation."""
-    extractor_cls, lg_feature = EXTRACTORS[method]
-    extractor = extractor_cls(max_num_keypoints=args.num_keypoints).eval().to(device)
+    extractor = _extractor(method, device, args.num_keypoints)
 
     feats0 = extractor.extract(load_image(paths[0]).to(device))
     feats1 = extractor.extract(load_image(paths[1]).to(device))
@@ -198,7 +232,7 @@ def evaluate(method, matcher_name, paths, info, device, stretcher, args):
                 normalize=True, inv_temp=args.inv_temp, threshold=0.01,
             )
     else:
-        lg = LightGlue(features=lg_feature).eval().to(device)
+        lg = _lightglue(method, device)
         if method == "stretcher":
             base, deformed = match_lightglue_stretched(
                 lg, feats0, feats1, stretched, device, args.lg_topk
@@ -265,6 +299,11 @@ def main():
                       f"prec={scores['precision']*100:5.2f}%  "
                       f"n={scores['num_matches']:4d}  "
                       f"H={scores['entropy']:.2f}  SBP={scores['sb_precision']:.2f}")
+
+        if device.type == "mps":
+            torch.mps.empty_cache()
+        elif device.type == "cuda":
+            torch.cuda.empty_cache()
 
     print(f"\ncompleted in {time.time() - started:.1f}s")
     report(results, args)

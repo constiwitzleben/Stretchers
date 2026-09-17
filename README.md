@@ -156,9 +156,13 @@ and point `dataset_creation.ipynb` there.
 - Quantitative evaluation uses **synthetic FEM deformation** of real surgical images. Real
   surgical results are qualitative, since dense ground-truth correspondences under real tissue
   deformation are unavailable.
-- The **LightGlue path is not optimised**: it runs the matcher once per hypothesis, which
-  takes minutes. The Dual Softmax path batches hypotheses and is fast. This is a property of
-  the current implementation, not the method.
+- The **LightGlue path is not optimised**. It runs the matcher once per hypothesis, and costs
+  more than that alone implies: LightGlue exits early once confident, but Stretcher's
+  hypotheses keep confidence low, so the full layer stack runs almost every time — 3.1s per
+  pass against 0.15s on unmodified descriptors, roughly 21× slower. Most of the 125
+  hypotheses are a poor fit for any given keypoint, exactly the regime early exit cannot
+  help. Batching hypotheses or pre-filtering them per keypoint would address it. The Dual
+  Softmax path does not have this problem and runs in seconds.
 - Trained and evaluated on **laparoscopic liver imagery**; transfer to other tissue or
   modalities is untested.
 
