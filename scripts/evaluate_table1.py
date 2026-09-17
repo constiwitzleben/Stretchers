@@ -137,8 +137,15 @@ def stretch(descriptors, stretcher, device):
     return torch.tensor(out).to(device)
 
 
+@torch.no_grad()
 def match_lightglue_stretched(lg, feats0, feats1, stretched, device, topk):
-    """LightGlue over every descriptor hypothesis, keeping each keypoint's best match."""
+    """LightGlue over every descriptor hypothesis, keeping each keypoint's best match.
+
+    LightGlue.forward is not itself wrapped in no_grad, so without the decorator
+    above each of the 125 iterations keeps its autograd graph alive through the
+    match tensors stored below. Memory grows into the gigabytes and the loop
+    slows down accordingly. Inference only - results are unchanged.
+    """
     best_def, best_base, best_score = {}, {}, {}
 
     for h in range(stretched.shape[0]):

@@ -264,28 +264,33 @@ def stretched_matching(
         base_carrier = {}
 
         num_strains = stretched_descriptions.shape[0]
-        for i in range(num_strains):
-            feats0['descriptors'] = stretched_descriptions[i][None].to(device)
-            out = lg({'image0': feats0, 'image1': feats1})
-            matches = out['matches'][0]
-            scores = out['scores'][0]
 
-            base_indices = matches[:, 0]
-            base_kps = feats0['keypoints'][0][matches[:, 0]]
-            def_kps = feats1['keypoints'][0][matches[:, 1]]
+        # LightGlue.forward is not itself wrapped in no_grad. Without this, each
+        # of the 125 hypotheses keeps its autograd graph alive through the match
+        # tensors retained below: memory climbs into the gigabytes and the loop
+        # slows badly, for gradients that are never used.
+        with torch.no_grad():
+            for i in range(num_strains):
+                feats0['descriptors'] = stretched_descriptions[i][None].to(device)
+                out = lg({'image0': feats0, 'image1': feats1})
+                matches = out['matches'][0]
+                scores = out['scores'][0]
 
-            for j in range(len(base_indices)):
-                idx = int(base_indices[j].item())
-                score = float(scores[j].item())
-                if idx not in best_matches or score > best_scores[idx]:
-                    best_matches[idx] = def_kps[j]
-                    base_carrier[idx] = base_kps[j]
-                    best_scores[idx] = score
+                base_indices = matches[:, 0]
+                base_kps = feats0['keypoints'][0][matches[:, 0]]
+                def_kps = feats1['keypoints'][0][matches[:, 1]]
+
+                for j in range(len(base_indices)):
+                    idx = int(base_indices[j].item())
+                    score = float(scores[j].item())
+                    if idx not in best_matches or score > best_scores[idx]:
+                        best_matches[idx] = def_kps[j]
+                        base_carrier[idx] = base_kps[j]
+                        best_scores[idx] = score
 
         if len(best_matches) == 0:
             raise RuntimeError("No LightGlue matches found across stretched descriptors.")
 
-        import torch
         unique_base = torch.stack(list(base_carrier.values()))
         unique_def = torch.stack(list(best_matches.values()))
         unique_scores = torch.tensor(list(best_scores.values()), device=device)
