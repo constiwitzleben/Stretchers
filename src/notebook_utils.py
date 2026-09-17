@@ -15,9 +15,33 @@ from .affine_transformations import generate_strain_tensors, apply_corotated_str
 from .dsm_matching import StretcherDualSoftMaxMatcher
 from .descriptors import sp_detect_and_describe, custom_sample_descriptors
 
-import fenics as fe
 import cv2
-import pyvista as pv
+
+# FEniCS and PyVista are required only by the FEM synthetic-deformation helpers
+# further down this file (create_deformed_medical_image_pair and friends).
+# Both are conda-only packages with no Windows build, so the import is guarded:
+# real_matching.ipynb, dataset_creation.ipynb and model_training.ipynb all run
+# without them.
+try:
+    import fenics as fe
+    import pyvista as pv
+    _FEM_AVAILABLE = True
+except ImportError:  # pragma: no cover - depends on the installed environment
+    fe = None
+    pv = None
+    _FEM_AVAILABLE = False
+
+
+def _require_fem():
+    """Raise an actionable error if the FEM stack is missing."""
+    if not _FEM_AVAILABLE:
+        raise ImportError(
+            "This function needs FEniCS and PyVista, which are not installed.\n"
+            "They are available from conda-forge only:\n"
+            "    conda env create -f environment.yml\n"
+            "    conda activate stretcher\n"
+            "Note: real_matching.ipynb does not require them."
+        )
 
 def get_best_device(verbose = False):
     device = torch.device('cpu')
@@ -212,7 +236,7 @@ def stretched_matching(
     image0,
     image1,
     device,
-    inv_temp=20,
+    inv_temp=20,      # paper setting; see scripts/evaluate_table1.py
     dsm_threshold=0.03,
     topk=500,
     baseline_img=None,
@@ -432,6 +456,8 @@ def von_mises_strain(E,u):
                               (E[2, 2] - E[0, 0])**2 + 6 * (E[0, 1]**2 + E[1, 2]**2 + E[2, 0]**2)))
 
 def create_deformed_medical_image_pair(image_dir, deformed_image_dir, g_zy=12e6, g_zx=1e6):
+
+    _require_fem()
 
     # --------------------
     # Parameters

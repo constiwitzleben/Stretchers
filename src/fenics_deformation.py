@@ -1,8 +1,19 @@
-import fenics as fe
 import matplotlib.pyplot as plt
 import numpy as np
 import cv2
-import pyvista as pv
+
+# FEniCS and PyVista are conda-only packages with no Windows build. Every
+# function in this module needs them, but importing the module must not fail
+# for users who only run the real-image matching pipeline, which reaches this
+# file solely for the `get_strain` symbol.
+try:
+    import fenics as fe
+    import pyvista as pv
+    _FEM_AVAILABLE = True
+except ImportError:  # pragma: no cover - depends on the installed environment
+    fe = None
+    pv = None
+    _FEM_AVAILABLE = False
 
 #https://fenics-solid-tutorial.readthedocs.io/en/latest/2DPlaneStrain/2D_Elasticity.html#
 
