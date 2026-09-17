@@ -2,18 +2,55 @@ import matplotlib.pyplot as plt
 import numpy as np
 import cv2
 
-# FEniCS and PyVista are conda-only packages with no Windows build. Every
-# function in this module needs them, but importing the module must not fail
-# for users who only run the real-image matching pipeline, which reaches this
-# file solely for the `get_strain` symbol.
+# ---------------------------------------------------------------------------
+# FEniCS / PyVista import
+#
+# This module owns the FEniCS import for the whole package; notebook_utils
+# re-uses the symbols defined here.
+#
+# FEniCS 2019.1.0 JIT-compiles variational forms at runtime and locates DOLFIN
+# through pkg-config. The conda package ships dolfin.pc under
+# $CONDA_PREFIX/lib/pkgconfig but does not add that directory to
+# PKG_CONFIG_PATH, so `import fenics` fails with
+#   RuntimeError: Could not find DOLFIN pkg-config file
+# on an otherwise correct install. We repair the path before importing rather
+# than making every user discover this for themselves.
+#
+# Both packages are conda-only and have no Windows build, so the import is
+# guarded: the real-image matching pipeline reaches this file only for
+# `get_strain` and must not fail without them.
+# ---------------------------------------------------------------------------
+import os
+import sys
+
+_pc_dir = os.path.join(sys.prefix, "lib", "pkgconfig")
+if os.path.isdir(_pc_dir):
+    _pc_path = os.environ.get("PKG_CONFIG_PATH", "")
+    if _pc_dir not in _pc_path.split(os.pathsep):
+        os.environ["PKG_CONFIG_PATH"] = (
+            f"{_pc_dir}{os.pathsep}{_pc_path}" if _pc_path else _pc_dir
+        )
+
 try:
     import fenics as fe
     import pyvista as pv
     _FEM_AVAILABLE = True
-except ImportError:  # pragma: no cover - depends on the installed environment
+except (ImportError, RuntimeError, OSError):  # pragma: no cover - env dependent
     fe = None
     pv = None
     _FEM_AVAILABLE = False
+
+
+def _require_fem():
+    """Raise an actionable error if the FEM stack is unavailable."""
+    if not _FEM_AVAILABLE:
+        raise ImportError(
+            "This function needs FEniCS and PyVista, which are not available.\n"
+            "They come from conda-forge only:\n"
+            "    conda env create -f environment.yml\n"
+            "    conda activate stretcher\n"
+            "Note: real_matching.ipynb does not require them."
+        )
 
 #https://fenics-solid-tutorial.readthedocs.io/en/latest/2DPlaneStrain/2D_Elasticity.html#
 

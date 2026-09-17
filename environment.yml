@@ -29,6 +29,14 @@ dependencies:
   # --- FEM solver (conda-forge only) ---
   - fenics=2019.1.0
 
+  # FEniCS 2019 JIT-compiles variational forms at runtime, so it needs a C++
+  # toolchain and pkg-config present in the environment. cxx-compiler is the
+  # portable metapackage (clang on macOS, gcc on Linux) - do not replace it
+  # with platform-specific compiler packages, which is what made the previous
+  # exported environment.yml unsolvable anywhere but osx-arm64.
+  - cxx-compiler
+  - pkg-config
+
   # --- pulled in by fenics; pinned to the known-good versions ---
   - numpy=2.0.2
 

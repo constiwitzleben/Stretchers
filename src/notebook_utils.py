@@ -17,31 +17,9 @@ from .descriptors import sp_detect_and_describe, custom_sample_descriptors
 
 import cv2
 
-# FEniCS and PyVista are required only by the FEM synthetic-deformation helpers
-# further down this file (create_deformed_medical_image_pair and friends).
-# Both are conda-only packages with no Windows build, so the import is guarded:
-# real_matching.ipynb, dataset_creation.ipynb and model_training.ipynb all run
-# without them.
-try:
-    import fenics as fe
-    import pyvista as pv
-    _FEM_AVAILABLE = True
-except ImportError:  # pragma: no cover - depends on the installed environment
-    fe = None
-    pv = None
-    _FEM_AVAILABLE = False
-
-
-def _require_fem():
-    """Raise an actionable error if the FEM stack is missing."""
-    if not _FEM_AVAILABLE:
-        raise ImportError(
-            "This function needs FEniCS and PyVista, which are not installed.\n"
-            "They are available from conda-forge only:\n"
-            "    conda env create -f environment.yml\n"
-            "    conda activate stretcher\n"
-            "Note: real_matching.ipynb does not require them."
-        )
+# The FEniCS/PyVista import (and the pkg-config repair it needs) lives in
+# fenics_deformation, which owns the FEM stack for the package.
+from .fenics_deformation import fe, pv, _FEM_AVAILABLE, _require_fem
 
 def get_best_device(verbose = False):
     device = torch.device('cpu')
