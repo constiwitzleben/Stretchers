@@ -1,0 +1,8 @@
+# Vendored third-party code (see THIRD_PARTY.md). Marking it vendored keeps
+# GitHub's language statistics reflecting the code actually written here rather
+# than the copies of LightGlue and DeDoDe bundled for reproducibility.
+lightglue/** linguist-vendored
+DeDoDe/**    linguist-vendored
+
+# Notebook outputs are large base64 blobs; collapse them in diffs.
+*.ipynb diff=jupyter

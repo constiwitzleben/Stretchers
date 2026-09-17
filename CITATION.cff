@@ -1,0 +1,44 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite the paper below."
+title: "Stretcher: deformation-robust keypoint descriptors"
+abstract: >-
+  Reference implementation of Stretcher, which improves keypoint matching under
+  soft-tissue deformation by learning how descriptors change under local affine
+  strain and applying that transformation in latent space.
+type: software
+license: MIT
+repository-code: "https://github.com/constiwitzleben/Stretchers"
+authors:
+  - family-names: "von Witzleben"
+    given-names: "Constantin"
+    affiliation: "Brigham and Women's Hospital, Harvard Medical School; Technical University of Munich"
+  - family-names: "Haouchine"
+    given-names: "Nazim"
+    affiliation: "Brigham and Women's Hospital, Harvard Medical School"
+keywords:
+  - surgical tracking
+  - image registration
+  - keypoint matching
+  - deformation robustness
+  - image features
+preferred-citation:
+  type: article
+  title: "Stretcher: a learning-based framework for deformation-robust keypoint descriptors"
+  authors:
+    - family-names: "von Witzleben"
+      given-names: "Constantin"
+    - family-names: "Haouchine"
+      given-names: "Nazim"
+  journal: "International Journal of Computer Assisted Radiology and Surgery"
+  volume: 21
+  issue: 7
+  start: 1657
+  end: 1663
+  year: 2026
+  month: 7
+  doi: "10.1007/s11548-026-03698-w"
+  identifiers:
+    - type: other
+      value: "PMID:42201605"
+    - type: other
+      value: "PMCID:PMC13553704"

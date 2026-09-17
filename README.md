@@ -2,15 +2,17 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Python 3.9](https://img.shields.io/badge/python-3.9-blue.svg)](environment.yml)
-[![Paper](https://img.shields.io/badge/paper-IPCAI%2FIJCARS%202026-b31b1b.svg)](#citation)
+[![DOI](https://img.shields.io/badge/DOI-10.1007%2Fs11548--026--03698--w-b31b1b.svg)](https://doi.org/10.1007/s11548-026-03698-w)
+[![PMC](https://img.shields.io/badge/PMC-13553704-green.svg)](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC13553704/)
 
 Keypoint descriptors degrade badly when soft tissue stretches. **Stretcher** learns how a
 descriptor *changes* under local affine strain and applies that transformation directly in
 latent space — so a single keypoint can be matched against many deformation hypotheses
 without ever recomputing image features.
 
-Reference implementation for *Stretcher: A Learning-Based Framework for Deformation-Robust
-Keypoint Descriptors* (von Witzleben & Haouchine).
+Reference implementation for [*Stretcher: a learning-based framework for deformation-robust
+keypoint descriptors*](https://doi.org/10.1007/s11548-026-03698-w) — von Witzleben & Haouchine,
+*Int J Comput Assist Radiol Surg* **21**(7):1657–1663, 2026.
 
 ![Baseline vs Stretcher on a real deformed pig liver](docs/comparison.png)
 
@@ -211,13 +213,25 @@ scripts/
 ## Citation
 
 ```bibtex
-@article{vonwitzleben2026stretcher,
-  title   = {Stretcher: A Learning-Based Framework for Deformation-Robust Keypoint Descriptors},
+@article{vonWitzleben2026stretcher,
+  title   = {Stretcher: a learning-based framework for deformation-robust keypoint descriptors},
   author  = {von Witzleben, Constantin and Haouchine, Nazim},
   journal = {International Journal of Computer Assisted Radiology and Surgery},
-  year    = {2026}
+  volume  = {21},
+  number  = {7},
+  pages   = {1657--1663},
+  year    = {2026},
+  month   = jul,
+  doi     = {10.1007/s11548-026-03698-w},
+  pmid    = {42201605},
+  pmcid   = {PMC13553704}
 }
 ```
+
+von Witzleben C, Haouchine N. *Stretcher: a learning-based framework for deformation-robust
+keypoint descriptors.* Int J Comput Assist Radiol Surg. 2026 Jul;21(7):1657–1663.
+[doi:10.1007/s11548-026-03698-w](https://doi.org/10.1007/s11548-026-03698-w) ·
+[PMC13553704](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC13553704/)
 
 ---
 
