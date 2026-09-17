@@ -118,9 +118,11 @@ match count for correspondences that survive in deformed regions. Under LightGlu
 highest entropy of any method (0.91), meaning its correct matches are the most evenly spread
 across deformation severity.
 
-
-Reported as mean ± std over the four load cases. Small deviations from the published table are
-expected from GPU non-determinism.
+Values are mean ± std over the four load cases. Measured wall time on an M-series Mac: the
+four Dual Softmax rows take **23s** and the three LightGlue baselines **68s**, while
+Stretcher + LightGlue alone takes **1h 56m** — see [Limitations](#limitations) for why. Run
+the fast rows on their own with `--matchers dsm`; results merge across invocations, so the
+slow row can be added later.
 
 ---
 
