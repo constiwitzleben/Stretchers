@@ -1,0 +1,108 @@
+# ---------------------------------------------------------------------------
+# Python
+# ---------------------------------------------------------------------------
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# ---------------------------------------------------------------------------
+# Jupyter
+# ---------------------------------------------------------------------------
+**/.ipynb_checkpoints/
+
+# ---------------------------------------------------------------------------
+# Run artefacts
+# ---------------------------------------------------------------------------
+runs/
+plots/
+Visualisations/
+demos/Visualisations/
+
+# ---------------------------------------------------------------------------
+# Datasets
+# Cholec80 is not redistributable (see THIRD_PARTY.md). Only the small
+# pig-liver images used by the evaluation notebooks are tracked.
+# ---------------------------------------------------------------------------
+data/*
+!data/medical_deformed/
+data/medical_deformed/*
+!data/medical_deformed/pig_liver_to_elongate.png
+!data/medical_deformed/pl_rest.png
+!data/medical_deformed/pl_def1.png
+!data/medical_deformed/pl_def2.png
+!data/medical_deformed/pl_def3.png
+
+# ---------------------------------------------------------------------------
+# Model weights
+# Only the released Stretcher weights are tracked. Locally trained checkpoints
+# and third-party detector/descriptor weights stay out of the repository.
+# ---------------------------------------------------------------------------
+models/*
+!models/stretcher_superpoint.pth
+
+# ---------------------------------------------------------------------------
+# Vendored third-party code
+# Only the files actually imported are tracked; see THIRD_PARTY.md for the
+# exact list and the licence of each project. The full upstream checkouts and
+# the unused modules stay local.
+# ---------------------------------------------------------------------------
+LightGlue-main/
+DeDoDe-main/
+silkmain/
+
+lightglue/*
+!lightglue/__init__.py
+!lightglue/aliked.py
+!lightglue/disk.py
+!lightglue/lightglue.py
+!lightglue/superpoint.py
+!lightglue/utils.py
+!lightglue/viz2d.py
+!lightglue/LICENSE
+
+DeDoDe/*
+!DeDoDe/LICENSE
+!DeDoDe/utils.py
+!DeDoDe/matchers/
+DeDoDe/matchers/*
+!DeDoDe/matchers/__init__.py
+!DeDoDe/matchers/dual_softmax_matcher.py
+
+# ---------------------------------------------------------------------------
+# Pre-refactor code, kept locally for reference. Superseded by src/.
+# The two table_making scripts are the source for scripts/evaluate_table1.py.
+# ---------------------------------------------------------------------------
+src_old/
+util/
+matchers/
+Visualisations_notebook/
+*_old.ipynb
+Train_Model.ipynb
+Train_One_Transformation.ipynb
+Affine_Matching_Test.py
+DSM_Image_Matching.py
+Deformed_Keypoint_Extraction_Test.py
+Image_Matching.py
+Image_Matching_Fenics.py
+Sample_Image_Patches.py
+Stretcher_Precision_Test.py
+Stretcher_Precision_Test_SP.py
+SuperPoint_Image_Matching.py
+create_SuperPoint_dataset.py
+fenics_2D_elasticity_grid_proj.py
+old_fenics.py
+similarity_drop.py
+table_making.py
+table_making_stretcher.py
+training_models.py
+bib_test.py
+grayscale_to_rgb.py
+dummy.ipynb
+test.py
+
+# ---------------------------------------------------------------------------
+# OS
+# ---------------------------------------------------------------------------
+.DS_Store
